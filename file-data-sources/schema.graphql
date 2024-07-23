@@ -1,8 +1,8 @@
 type Transfer @entity(immutable: true) {
-  id: Bytes!
-  transfers: Account!
-  from: Bytes! # address
-  to: Bytes! # address
+  id: ID!
+  account: Account! @derivedFrom(field: "transfers")
+  from: Bytes! # address of sender
+  to: Bytes! # address of receiver
   tokenId: BigInt! # uint256
   blockNumber: BigInt!
   blockTimestamp: BigInt!
@@ -11,8 +11,14 @@ type Transfer @entity(immutable: true) {
 
 type Account @entity {
   id: ID!
+  sendCount: Int!
+  receiveCount: Int!
+  totalTransferredOut: BigInt!
+  totalReceived: BigInt!
+  totalBalance: BigInt!
   nfts: [NFT!]! @derivedFrom(field: "owner")
-  transfers: [Transfer!]! @derivedFrom(field: "transfers")
+  transfers: [Transfer!]! @derivedFrom(field: "account")
+  createdAt: BigInt! @index
 }
 
 type NFT @entity {
@@ -20,9 +26,10 @@ type NFT @entity {
   owner: Account!
   tokenID: BigInt!
   tokenURI: String!
-  externalURL: String!
-  ipfsURI: String!
-  updatedAtTimestamp: BigInt
+  externalURL: String
+  ipfsURI: String
+  updatedAtTimestamp: BigInt! @index
+  metadata: NFTMetadata @derivedFrom(field: "nft")
 }
 
 type NFTMetadata @entity {
@@ -34,6 +41,7 @@ type NFTMetadata @entity {
   sun: String!
   moon: String!
   rising: String!
+  nft: NFT! @derivedFrom(field: "metadata")
 }
 
 type _Schema_
@@ -43,7 +51,7 @@ type _Schema_
     algorithm: rank
     include: [
       {
-        entity: "Token"
+        entity: "NFTMetadata"
         fields: [
           { name: "name" }
           { name: "description" }
