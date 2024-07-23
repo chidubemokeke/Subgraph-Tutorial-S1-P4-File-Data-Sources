@@ -1,34 +1,6 @@
-type Approval @entity(immutable: true) {
-  id: Bytes!
-  owner: Bytes! # address
-  approved: Bytes! # address
-  tokenId: BigInt! # uint256
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type ApprovalForAll @entity(immutable: true) {
-  id: Bytes!
-  owner: Bytes! # address
-  operator: Bytes! # address
-  approved: Boolean! # bool
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type OwnershipTransferred @entity(immutable: true) {
-  id: Bytes!
-  previousOwner: Bytes! # address
-  newOwner: Bytes! # address
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
 type Transfer @entity(immutable: true) {
   id: Bytes!
+  transfers: Account!
   from: Bytes! # address
   to: Bytes! # address
   tokenId: BigInt! # uint256
@@ -36,3 +8,50 @@ type Transfer @entity(immutable: true) {
   blockTimestamp: BigInt!
   transactionHash: Bytes!
 }
+
+type Account @entity {
+  id: ID!
+  nfts: [NFT!]! @derivedFrom(field: "owner")
+  transfers: [Transfer!]! @derivedFrom(field: "transfers")
+}
+
+type NFT @entity {
+  id: ID!
+  owner: Account!
+  tokenID: BigInt!
+  tokenURI: String!
+  externalURL: String!
+  ipfsURI: String!
+  updatedAtTimestamp: BigInt
+}
+
+type NFTMetadata @entity {
+  id: ID!
+  image: String!
+  name: String!
+  description: String!
+  type: String!
+  sun: String!
+  moon: String!
+  rising: String!
+}
+
+type _Schema_
+  @fulltext(
+    name: "covenSearch"
+    language: en
+    algorithm: rank
+    include: [
+      {
+        entity: "Token"
+        fields: [
+          { name: "name" }
+          { name: "description" }
+          { name: "type" }
+          { name: "sun" }
+          { name: "moon" }
+          { name: "rising" }
+        ]
+      }
+    ]
+  )
