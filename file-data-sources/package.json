@@ -1,0 +1,18 @@
+{
+  "name": "file-data-sources",
+  "license": "UNLICENSED",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ file-data-sources",
+    "create-local": "graph create --node http://localhost:8020/ file-data-sources",
+    "remove-local": "graph remove --node http://localhost:8020/ file-data-sources",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 file-data-sources",
+    "test": "graph test"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.79.0",
+    "@graphprotocol/graph-ts": "0.32.0"
+  },
+  "devDependencies": { "matchstick-as": "0.5.0" }
+}
