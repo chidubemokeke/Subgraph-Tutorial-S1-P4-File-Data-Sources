@@ -1,24 +1,23 @@
+type Account @entity {
+  id: ID!
+  totalReceived: BigInt!
+  totalSent: BigInt!
+  totalBalance: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  nfts: [NFT!]! @derivedFrom(field: "owner") # All NFTs owned by Account
+  transfers: [Transfer!]! @derivedFrom(field: "account")
+}
+
 type Transfer @entity(immutable: true) {
   id: ID!
-  account: Account! @derivedFrom(field: "transfers")
+  account: Account!
   from: Bytes! # address of sender
   to: Bytes! # address of receiver
   tokenId: BigInt! # uint256
+  transferCount: BigInt!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type Account @entity {
-  id: ID!
-  sendCount: Int!
-  receiveCount: Int!
-  totalTransferredOut: BigInt!
-  totalReceived: BigInt!
-  totalBalance: BigInt!
-  nfts: [NFT!]! @derivedFrom(field: "owner")
-  transfers: [Transfer!]! @derivedFrom(field: "account")
-  createdAt: BigInt! @index
 }
 
 type NFT @entity {
@@ -26,17 +25,22 @@ type NFT @entity {
   owner: Account!
   tokenID: BigInt!
   tokenURI: String!
-  externalURL: String
   ipfsURI: String
-  updatedAtTimestamp: BigInt! @index
-  metadata: NFTMetadata @derivedFrom(field: "nft")
+  originalOwner: Bytes!
+  currentOwner: Bytes!
+  saleCount: BigInt!
+  buyCount: BigInt!
+  blockTimestamp: BigInt!
+  blockNumber: BigInt!
+  metadata: Metadata @derivedFrom(field: "nft")
 }
 
-type NFTMetadata @entity {
+type Metadata @entity {
   id: ID!
+  description: String!
+  externalURL: String
   image: String!
   name: String!
-  description: String!
   type: String!
   sun: String!
   moon: String!
