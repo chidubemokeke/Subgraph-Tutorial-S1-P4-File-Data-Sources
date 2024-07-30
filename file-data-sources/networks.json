@@ -1,7 +1,7 @@
 {
   "mainnet": {
-    "CryptoCoven": {
-      "address": "0x5180db8F5c931aaE63c74266b211F580155ecac8",
+    "OpenSea": {
+      "address": "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b",
       "startBlock": 13547115
     }
   }
