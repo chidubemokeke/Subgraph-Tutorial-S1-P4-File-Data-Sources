@@ -1,41 +1,45 @@
 type Account @entity {
   id: ID!
-  totalReceived: BigInt!
-  totalSent: BigInt!
-  totalBalance: BigInt!
+  buyCount: BigInt
+  sellCount: BigInt
+  mintCount: BigInt
+  totalBalance: BigInt
   blockNumber: BigInt!
   blockTimestamp: BigInt!
-  nfts: [NFT!]! @derivedFrom(field: "owner") # All NFTs owned by Account
+  nfts: [NFT!]! @derivedFrom(field: "currentOwner") # All NFTs owned by Account
   transfers: [Transfer!]! @derivedFrom(field: "account")
 }
 
-type Transfer @entity(immutable: true) {
+type Transfer @entity {
   id: ID!
   account: Account!
   from: Bytes! # address of sender
   to: Bytes! # address of receiver
   tokenId: BigInt! # uint256
   transferCount: BigInt!
+  buyer: Bytes
+  seller: Bytes
+  isSale: Boolean
+  isMint: Boolean
+  amountSold: BigInt
   blockNumber: BigInt!
   blockTimestamp: BigInt!
 }
 
 type NFT @entity {
   id: ID!
-  owner: Account!
+  currentOwner: Account!
   tokenID: BigInt!
   tokenURI: String!
-  ipfsURI: String
-  originalOwner: Bytes!
-  currentOwner: Bytes!
+  ipfsURI: NFTMetadata
+  firstOwner: Bytes!
   saleCount: BigInt!
   buyCount: BigInt!
   blockTimestamp: BigInt!
   blockNumber: BigInt!
-  metadata: Metadata @derivedFrom(field: "nft")
 }
 
-type Metadata @entity {
+type NFTMetadata @entity {
   id: ID!
   description: String!
   externalURL: String
@@ -45,7 +49,6 @@ type Metadata @entity {
   sun: String!
   moon: String!
   rising: String!
-  nft: NFT! @derivedFrom(field: "metadata")
 }
 
 type _Schema_
