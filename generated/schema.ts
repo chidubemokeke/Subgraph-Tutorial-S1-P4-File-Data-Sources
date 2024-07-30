@@ -50,43 +50,72 @@ export class Account extends Entity {
     this.set("id", Value.fromString(value));
   }
 
-  get totalReceived(): BigInt {
-    let value = this.get("totalReceived");
+  get buyCount(): BigInt | null {
+    let value = this.get("buyCount");
     if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
+      return null;
     } else {
       return value.toBigInt();
     }
   }
 
-  set totalReceived(value: BigInt) {
-    this.set("totalReceived", Value.fromBigInt(value));
+  set buyCount(value: BigInt | null) {
+    if (!value) {
+      this.unset("buyCount");
+    } else {
+      this.set("buyCount", Value.fromBigInt(<BigInt>value));
+    }
   }
 
-  get totalSent(): BigInt {
-    let value = this.get("totalSent");
+  get saleCount(): BigInt | null {
+    let value = this.get("saleCount");
     if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
+      return null;
     } else {
       return value.toBigInt();
     }
   }
 
-  set totalSent(value: BigInt) {
-    this.set("totalSent", Value.fromBigInt(value));
+  set saleCount(value: BigInt | null) {
+    if (!value) {
+      this.unset("saleCount");
+    } else {
+      this.set("saleCount", Value.fromBigInt(<BigInt>value));
+    }
   }
 
-  get totalBalance(): BigInt {
+  get mintCount(): BigInt | null {
+    let value = this.get("mintCount");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set mintCount(value: BigInt | null) {
+    if (!value) {
+      this.unset("mintCount");
+    } else {
+      this.set("mintCount", Value.fromBigInt(<BigInt>value));
+    }
+  }
+
+  get totalBalance(): BigInt | null {
     let value = this.get("totalBalance");
     if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
+      return null;
     } else {
       return value.toBigInt();
     }
   }
 
-  set totalBalance(value: BigInt) {
-    this.set("totalBalance", Value.fromBigInt(value));
+  set totalBalance(value: BigInt | null) {
+    if (!value) {
+      this.unset("totalBalance");
+    } else {
+      this.set("totalBalance", Value.fromBigInt(<BigInt>value));
+    }
   }
 
   get blockNumber(): BigInt {
@@ -119,16 +148,16 @@ export class Account extends Entity {
     return new NFTLoader("Account", this.get("id")!.toString(), "nfts");
   }
 
-  get transfers(): TransferLoader {
-    return new TransferLoader(
+  get transactions(): TransactionLoader {
+    return new TransactionLoader(
       "Account",
       this.get("id")!.toString(),
-      "transfers",
+      "transactions",
     );
   }
 }
 
-export class Transfer extends Entity {
+export class Transaction extends Entity {
   constructor(id: string) {
     super();
     this.set("id", Value.fromString(id));
@@ -136,22 +165,24 @@ export class Transfer extends Entity {
 
   save(): void {
     let id = this.get("id");
-    assert(id != null, "Cannot save Transfer entity without an ID");
+    assert(id != null, "Cannot save Transaction entity without an ID");
     if (id) {
       assert(
         id.kind == ValueKind.STRING,
-        `Entities of type Transfer must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
+        `Entities of type Transaction must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
       );
-      store.set("Transfer", id.toString(), this);
+      store.set("Transaction", id.toString(), this);
     }
   }
 
-  static loadInBlock(id: string): Transfer | null {
-    return changetype<Transfer | null>(store.get_in_block("Transfer", id));
+  static loadInBlock(id: string): Transaction | null {
+    return changetype<Transaction | null>(
+      store.get_in_block("Transaction", id),
+    );
   }
 
-  static load(id: string): Transfer | null {
-    return changetype<Transfer | null>(store.get("Transfer", id));
+  static load(id: string): Transaction | null {
+    return changetype<Transaction | null>(store.get("Transaction", id));
   }
 
   get id(): string {
@@ -219,17 +250,115 @@ export class Transfer extends Entity {
     this.set("tokenId", Value.fromBigInt(value));
   }
 
-  get transferCount(): BigInt {
-    let value = this.get("transferCount");
+  get buyer(): Bytes | null {
+    let value = this.get("buyer");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBytes();
+    }
+  }
+
+  set buyer(value: Bytes | null) {
+    if (!value) {
+      this.unset("buyer");
+    } else {
+      this.set("buyer", Value.fromBytes(<Bytes>value));
+    }
+  }
+
+  get seller(): Bytes | null {
+    let value = this.get("seller");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBytes();
+    }
+  }
+
+  set seller(value: Bytes | null) {
+    if (!value) {
+      this.unset("seller");
+    } else {
+      this.set("seller", Value.fromBytes(<Bytes>value));
+    }
+  }
+
+  get type(): string {
+    let value = this.get("type");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toString();
+    }
+  }
+
+  set type(value: string) {
+    this.set("type", Value.fromString(value));
+  }
+
+  get nft(): string {
+    let value = this.get("nft");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toString();
+    }
+  }
+
+  set nft(value: string) {
+    this.set("nft", Value.fromString(value));
+  }
+
+  get amountSold(): BigInt | null {
+    let value = this.get("amountSold");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
     } else {
       return value.toBigInt();
     }
   }
 
-  set transferCount(value: BigInt) {
-    this.set("transferCount", Value.fromBigInt(value));
+  set amountSold(value: BigInt | null) {
+    if (!value) {
+      this.unset("amountSold");
+    } else {
+      this.set("amountSold", Value.fromBigInt(<BigInt>value));
+    }
+  }
+
+  get totalAmountSold(): BigInt | null {
+    let value = this.get("totalAmountSold");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set totalAmountSold(value: BigInt | null) {
+    if (!value) {
+      this.unset("totalAmountSold");
+    } else {
+      this.set("totalAmountSold", Value.fromBigInt(<BigInt>value));
+    }
+  }
+
+  get totalAmountBought(): BigInt | null {
+    let value = this.get("totalAmountBought");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set totalAmountBought(value: BigInt | null) {
+    if (!value) {
+      this.unset("totalAmountBought");
+    } else {
+      this.set("totalAmountBought", Value.fromBigInt(<BigInt>value));
+    }
   }
 
   get blockNumber(): BigInt {
@@ -298,8 +427,8 @@ export class NFT extends Entity {
     this.set("id", Value.fromString(value));
   }
 
-  get owner(): string {
-    let value = this.get("owner");
+  get currentOwner(): string {
+    let value = this.get("currentOwner");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
@@ -307,8 +436,8 @@ export class NFT extends Entity {
     }
   }
 
-  set owner(value: string) {
-    this.set("owner", Value.fromString(value));
+  set currentOwner(value: string) {
+    this.set("currentOwner", Value.fromString(value));
   }
 
   get tokenID(): BigInt {
@@ -354,8 +483,8 @@ export class NFT extends Entity {
     }
   }
 
-  get originalOwner(): Bytes {
-    let value = this.get("originalOwner");
+  get firstOwner(): Bytes {
+    let value = this.get("firstOwner");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
@@ -363,21 +492,8 @@ export class NFT extends Entity {
     }
   }
 
-  set originalOwner(value: Bytes) {
-    this.set("originalOwner", Value.fromBytes(value));
-  }
-
-  get currentOwner(): Bytes {
-    let value = this.get("currentOwner");
-    if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
-    } else {
-      return value.toBytes();
-    }
-  }
-
-  set currentOwner(value: Bytes) {
-    this.set("currentOwner", Value.fromBytes(value));
+  set firstOwner(value: Bytes) {
+    this.set("firstOwner", Value.fromBytes(value));
   }
 
   get saleCount(): BigInt {
@@ -406,6 +522,27 @@ export class NFT extends Entity {
     this.set("buyCount", Value.fromBigInt(value));
   }
 
+  get mintCount(): BigInt {
+    let value = this.get("mintCount");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set mintCount(value: BigInt) {
+    this.set("mintCount", Value.fromBigInt(value));
+  }
+
+  get transfers(): TransactionLoader {
+    return new TransactionLoader(
+      "NFT",
+      this.get("id")!.toString(),
+      "transfers",
+    );
+  }
+
   get blockTimestamp(): BigInt {
     let value = this.get("blockTimestamp");
     if (!value || value.kind == ValueKind.NULL) {
@@ -431,13 +568,9 @@ export class NFT extends Entity {
   set blockNumber(value: BigInt) {
     this.set("blockNumber", Value.fromBigInt(value));
   }
-
-  get metadata(): MetadataLoader {
-    return new MetadataLoader("NFT", this.get("id")!.toString(), "metadata");
-  }
 }
 
-export class Metadata extends Entity {
+export class NFTMetadata extends Entity {
   constructor(id: string) {
     super();
     this.set("id", Value.fromString(id));
@@ -445,22 +578,24 @@ export class Metadata extends Entity {
 
   save(): void {
     let id = this.get("id");
-    assert(id != null, "Cannot save Metadata entity without an ID");
+    assert(id != null, "Cannot save NFTMetadata entity without an ID");
     if (id) {
       assert(
         id.kind == ValueKind.STRING,
-        `Entities of type Metadata must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
+        `Entities of type NFTMetadata must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
       );
-      store.set("Metadata", id.toString(), this);
+      store.set("NFTMetadata", id.toString(), this);
     }
   }
 
-  static loadInBlock(id: string): Metadata | null {
-    return changetype<Metadata | null>(store.get_in_block("Metadata", id));
+  static loadInBlock(id: string): NFTMetadata | null {
+    return changetype<NFTMetadata | null>(
+      store.get_in_block("NFTMetadata", id),
+    );
   }
 
-  static load(id: string): Metadata | null {
-    return changetype<Metadata | null>(store.get("Metadata", id));
+  static load(id: string): NFTMetadata | null {
+    return changetype<NFTMetadata | null>(store.get("NFTMetadata", id));
   }
 
   get id(): string {
@@ -583,10 +718,6 @@ export class Metadata extends Entity {
   set rising(value: string) {
     this.set("rising", Value.fromString(value));
   }
-
-  get nft(): NFTLoader {
-    return new NFTLoader("Metadata", this.get("id")!.toString(), "nft");
-  }
 }
 
 export class NFTLoader extends Entity {
@@ -607,7 +738,7 @@ export class NFTLoader extends Entity {
   }
 }
 
-export class TransferLoader extends Entity {
+export class TransactionLoader extends Entity {
   _entity: string;
   _field: string;
   _id: string;
@@ -619,26 +750,8 @@ export class TransferLoader extends Entity {
     this._field = field;
   }
 
-  load(): Transfer[] {
+  load(): Transaction[] {
     let value = store.loadRelated(this._entity, this._id, this._field);
-    return changetype<Transfer[]>(value);
-  }
-}
-
-export class MetadataLoader extends Entity {
-  _entity: string;
-  _field: string;
-  _id: string;
-
-  constructor(entity: string, id: string, field: string) {
-    super();
-    this._entity = entity;
-    this._id = id;
-    this._field = field;
-  }
-
-  load(): Metadata[] {
-    let value = store.loadRelated(this._entity, this._id, this._field);
-    return changetype<Metadata[]>(value);
+    return changetype<Transaction[]>(value);
   }
 }

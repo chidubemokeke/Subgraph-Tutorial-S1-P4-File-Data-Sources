@@ -1,61 +1,68 @@
 # Enum for Transaction Types
+# This defines an enumeration called TransactionType.
+# Enums are a way to define a set of named values.
+# In this case, the values are SALE and MINT, which represent different types of transactions.
 enum TransactionType {
-  SALE
-  MINT
+  SALE # Represents a sale transaction where an NFT is sold
+  MINT # Represents a mint transaction where a new NFT is created
 }
 
+# Definition of the Account entity
 type Account @entity {
-  id: ID!
-  buyCount: BigInt
-  saleCount: BigInt
-  mintCount: BigInt
-  totalBalance: BigInt
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  nfts: [NFT!]! @derivedFrom(field: "currentOwner") # All NFTs owned by Account
-  transactions: [Transaction!]! @derivedFrom(field: "account")
+  id: ID! # A unique identifier for each account.
+  buyCount: BigInt # The total number of NFTs purchased by this account.
+  saleCount: BigInt # The total number of NFTs sold by this account.
+  mintCount: BigInt # The total number of NFTs minted by this account.
+  totalBalance: BigInt # The total balance of the account in terms of NFTs or cryptocurrency.
+  blockNumber: BigInt! # The block number when this entity was last updated. Helps in tracking historical changes.
+  blockTimestamp: BigInt! # The timestamp of the block when this entity was last updated. Provides a time reference.
+  nfts: [NFT!]! @derivedFrom(field: "currentOwner") # List of NFTs currently owned by this account. The '@derivedFrom' directive indicates this list is automatically populated based on the 'currentOwner' field in the NFT entity.
+  transactions: [Transaction!]! @derivedFrom(field: "account") # List of transactions associated with this account. Populated based on the 'account' field in the Transaction entity.
 }
 
+# Definition of the Transaction entity
 type Transaction @entity {
-  id: ID!
-  account: Account! # Updated field name for clarity
-  from: Bytes! # Address of sender if mint
-  to: Bytes! # Address of receiver
-  tokenId: BigInt! # uint256
-  buyer: Bytes
-  seller: Bytes
-  type: TransactionType! # Enum for transaction type (SALE or MINT)
-  nft: NFT! # Reference to the NFT involved in the transaction
-  amountSold: BigInt
-  totalAmountSold: BigInt
-  totalAmountBought: BigInt
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
+  id: ID! # A unique identifier for each transaction.
+  account: Account! # Reference to the Account entity involved in this transaction.
+  from: Bytes! # The address of the sender. Required if the transaction involves a mint.
+  to: Bytes! # The address of the receiver. Required for both mint and sale transactions.
+  tokenId: BigInt! # The unique identifier of the NFT being transferred.
+  buyer: Bytes # The address of the buyer (for sales).
+  seller: Bytes # The address of the seller (for sales).
+  type: TransactionType! # The type of the transaction, using the TransactionType enum defined earlier.
+  nft: NFT! # Reference to the NFT entity involved in this transaction.
+  amountSold: BigInt # The amount of the NFT sold (relevant for sales).
+  totalAmountSold: BigInt # The total amount of NFTs sold in this transaction (relevant for sales).
+  totalAmountBought: BigInt # The total amount of NFTs bought in this transaction (relevant for sales).
+  blockNumber: BigInt! # The block number when this transaction was recorded. Helps in tracking historical data.
+  blockTimestamp: BigInt! # The timestamp of the block when this transaction was recorded. Provides a time reference.
 }
 
+# Definition of the NFT entity
 type NFT @entity {
-  id: ID!
-  currentOwner: Account!
-  tokenID: BigInt!
-  tokenURI: String!
-  ipfsURI: NFTMetadata
-  firstOwner: Bytes!
-  saleCount: BigInt! # Total count of sales
-  buyCount: BigInt! # Total count of buys
-  mintCount: BigInt! # Total count of mints
-  transfers: [Transaction!]! @derivedFrom(field: "nft") # All transactions involving this NFT
-  blockTimestamp: BigInt!
-  blockNumber: BigInt!
+  id: ID! # A unique identifier for each NFT.
+  currentOwner: Account! # Reference to the Account entity that currently owns this NFT.
+  tokenID: BigInt! # The unique identifier of the NFT.
+  tokenURI: String! # The URI pointing to the metadata of the NFT.
+  ipfsURI: NFTMetadata # Reference to additional metadata for the NFT stored in IPFS.
+  firstOwner: Bytes! # The address of the first owner of this NFT.
+  saleCount: BigInt! # The total number of times this NFT has been sold.
+  buyCount: BigInt! # The total number of times this NFT has been bought.
+  mintCount: BigInt! # The total number of times this NFT has been minted.
+  transfers: [Transaction!]! @derivedFrom(field: "nft") # List of all transactions involving this NFT. Populated based on the 'nft' field in the Transaction entity.
+  blockTimestamp: BigInt! # The timestamp of the block when this NFT was last updated. Provides a time reference.
+  blockNumber: BigInt! # The block number when this NFT was last updated. Helps in tracking historical changes.
 }
 
+# Definition of the NFTMetadata entity
 type NFTMetadata @entity {
-  id: ID!
-  description: String!
-  externalURL: String
-  image: String!
-  name: String!
-  type: String!
-  sun: String!
-  moon: String!
-  rising: String!
+  id: ID! # A unique identifier for each NFTMetadata entity.
+  description: String! # Description of the NFT.
+  externalURL: String # An external URL related to the NFT, such as a website or profile page.
+  image: String! # URL to the image representing the NFT.
+  name: String! # Name of the NFT.
+  type: String! # Type of the NFT (e.g., artwork, collectible).
+  sun: String! # Metadata related to the NFT (e.g., astrological data).
+  moon: String! # Metadata related to the NFT (e.g., astrological data).
+  rising: String! # Metadata related to the NFT (e.g., astrological data).
 }

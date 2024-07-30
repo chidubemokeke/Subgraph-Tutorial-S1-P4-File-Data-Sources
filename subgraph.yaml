@@ -16,7 +16,9 @@ dataSources:
       apiVersion: 0.0.7
       language: wasm/assemblyscript
       entities:
-        - Transfer
+        - Account
+        - Transaction
+        - NFT
       abis:
         - name: CryptoCoven
           file: ./abis/CryptoCoven.json
@@ -37,6 +39,7 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - Account
+        - Transaction
       abis:
         - name: Opensea
           file: ./abis/Opensea.json
