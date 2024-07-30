@@ -51,6 +51,19 @@ type NFTMetadata @entity {
   rising: String!
 }
 
+type OrdersMatched @entity(immutable: true) {
+  id: Bytes!
+  buyHash: Bytes! # bytes32
+  sellHash: Bytes! # bytes32
+  maker: Bytes! # address
+  taker: Bytes! # address
+  price: BigInt! # uint256
+  metadata: Bytes! # bytes32
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
 type _Schema_
   @fulltext(
     name: "covenSearch"
