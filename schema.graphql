@@ -1,27 +1,34 @@
+# Enum for Transaction Types
+enum TransactionType {
+  SALE
+  MINT
+}
+
 type Account @entity {
   id: ID!
   buyCount: BigInt
-  sellCount: BigInt
+  saleCount: BigInt
   mintCount: BigInt
   totalBalance: BigInt
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   nfts: [NFT!]! @derivedFrom(field: "currentOwner") # All NFTs owned by Account
-  transfers: [Transfer!]! @derivedFrom(field: "account")
+  transactions: [Transaction!]! @derivedFrom(field: "account")
 }
 
-type Transfer @entity {
+type Transaction @entity {
   id: ID!
-  account: Account!
-  from: Bytes! # address of sender
-  to: Bytes! # address of receiver
+  account: Account! # Updated field name for clarity
+  from: Bytes! # Address of sender if mint
+  to: Bytes! # Address of receiver
   tokenId: BigInt! # uint256
-  transferCount: BigInt!
   buyer: Bytes
   seller: Bytes
-  isSale: Boolean
-  isMint: Boolean
+  type: TransactionType! # Enum for transaction type (SALE or MINT)
+  nft: NFT! # Reference to the NFT involved in the transaction
   amountSold: BigInt
+  totalAmountSold: BigInt
+  totalAmountBought: BigInt
   blockNumber: BigInt!
   blockTimestamp: BigInt!
 }
@@ -33,8 +40,10 @@ type NFT @entity {
   tokenURI: String!
   ipfsURI: NFTMetadata
   firstOwner: Bytes!
-  saleCount: BigInt!
-  buyCount: BigInt!
+  saleCount: BigInt! # Total count of sales
+  buyCount: BigInt! # Total count of buys
+  mintCount: BigInt! # Total count of mints
+  transfers: [Transaction!]! @derivedFrom(field: "nft") # All transactions involving this NFT
   blockTimestamp: BigInt!
   blockNumber: BigInt!
 }
@@ -50,36 +59,3 @@ type NFTMetadata @entity {
   moon: String!
   rising: String!
 }
-
-type OrdersMatched @entity(immutable: true) {
-  id: Bytes!
-  buyHash: Bytes! # bytes32
-  sellHash: Bytes! # bytes32
-  maker: Bytes! # address
-  taker: Bytes! # address
-  price: BigInt! # uint256
-  metadata: Bytes! # bytes32
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
-}
-
-type _Schema_
-  @fulltext(
-    name: "covenSearch"
-    language: en
-    algorithm: rank
-    include: [
-      {
-        entity: "NFTMetadata"
-        fields: [
-          { name: "name" }
-          { name: "description" }
-          { name: "type" }
-          { name: "sun" }
-          { name: "moon" }
-          { name: "rising" }
-        ]
-      }
-    ]
-  )
