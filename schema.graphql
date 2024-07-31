@@ -13,19 +13,19 @@ type Account @entity {
   buyCount: BigInt # The total number of NFTs purchased by this account.
   saleCount: BigInt # The total number of NFTs sold by this account.
   mintCount: BigInt # The total number of NFTs minted by this account.
-  totalBalance: BigInt # The total balance of the account in terms of NFTs or cryptocurrency.
+  totalBalance: BigInt # The total balance of the account in terms of cryptocurrency.
   blockNumber: BigInt! # The block number when this entity was last updated. Helps in tracking historical changes.
   blockTimestamp: BigInt! # The timestamp of the block when this entity was last updated. Provides a time reference.
-  nfts: [NFT!]! @derivedFrom(field: "currentOwner") # List of NFTs currently owned by this account. The '@derivedFrom' directive indicates this list is automatically populated based on the 'currentOwner' field in the NFT entity.
-  transactions: [Transaction!]! @derivedFrom(field: "account") # List of transactions associated with this account. Populated based on the 'account' field in the Transaction entity.
+  nfts: [NFT!]! @derivedFrom(field: "currentOwner") # List of NFTs currently owned by this account.
+  transactions: [Transaction!]! @derivedFrom(field: "account") # List of transactions associated with this account.
 }
 
 # Definition of the Transaction entity
 type Transaction @entity {
   id: ID! # A unique identifier for each transaction.
   account: Account! # Reference to the Account entity involved in this transaction.
-  from: Bytes! # The address of the sender. Required if the transaction involves a mint.
-  to: Bytes! # The address of the receiver. Required for both mint and sale transactions.
+  from: Bytes! # The address of the sender if the transaction involves a mint.
+  to: Bytes! # The address of the receiver of a mint
   tokenId: BigInt! # The unique identifier of the NFT being transferred.
   buyer: Bytes # The address of the buyer (for sales).
   seller: Bytes # The address of the seller (for sales).
@@ -49,7 +49,7 @@ type NFT @entity {
   saleCount: BigInt! # The total number of times this NFT has been sold.
   buyCount: BigInt! # The total number of times this NFT has been bought.
   mintCount: BigInt! # The total number of times this NFT has been minted.
-  transfers: [Transaction!]! @derivedFrom(field: "nft") # List of all transactions involving this NFT. Populated based on the 'nft' field in the Transaction entity.
+  transfers: [Transaction!]! @derivedFrom(field: "nft") # List of all transactions involving this NFT.
   blockTimestamp: BigInt! # The timestamp of the block when this NFT was last updated. Provides a time reference.
   blockNumber: BigInt! # The block number when this NFT was last updated. Helps in tracking historical changes.
 }
