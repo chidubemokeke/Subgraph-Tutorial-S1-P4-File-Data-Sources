@@ -66,3 +66,23 @@ type NFTMetadata @entity {
   moon: String! # Metadata related to the NFT (e.g., astrological data).
   rising: String! # Metadata related to the NFT (e.g., astrological data).
 }
+
+type _Schema_
+  @fulltext(
+    name: "covenSearch"
+    language: en
+    algorithm: rank
+    include: [
+      {
+        entity: "Token"
+        fields: [
+          { name: "name" }
+          { name: "description" }
+          { name: "type" }
+          { name: "sun" }
+          { name: "moon" }
+          { name: "rising" }
+        ]
+      }
+    ]
+  )
