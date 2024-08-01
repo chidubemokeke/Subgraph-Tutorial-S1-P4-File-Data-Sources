@@ -13,6 +13,8 @@ type Account @entity {
   buyCount: BigInt # The total number of NFTs purchased by this account.
   saleCount: BigInt # The total number of NFTs sold by this account.
   mintCount: BigInt # The total number of NFTs minted by this account.
+  totalBought: BigInt # The total value of NFTs bought
+  totalSold: BigInt # The total value of NFTs sold
   totalBalance: BigInt # The total balance of the account in terms of cryptocurrency.
   blockNumber: BigInt! # The block number when this entity was last updated. Helps in tracking historical changes.
   blockTimestamp: BigInt! # The timestamp of the block when this entity was last updated. Provides a time reference.
@@ -32,8 +34,8 @@ type Transaction @entity {
   seller: Bytes # The address of the seller (for sales).
   nft: NFT! # Reference to the NFT entity involved in this transaction.
   amountSold: BigInt # The amount of the NFT sold (relevant for sales).
-  totalAmountSold: BigInt # The total amount of NFTs sold in this transaction (relevant for sales).
-  totalAmountBought: BigInt # The total amount of NFTs bought in this transaction (relevant for sales).
+  totalSold: BigInt # The total amount of NFTs sold in this transaction (relevant for sales).
+  totalBought: BigInt # The total amount of NFTs bought in this transaction (relevant for sales).
   transactionCount: BigInt!
   blockNumber: BigInt! # The block number when this transaction was recorded. Helps in tracking historical data.
   blockTimestamp: BigInt! # The timestamp of the block when this transaction was recorded. Provides a time reference.
