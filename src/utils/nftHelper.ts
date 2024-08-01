@@ -22,12 +22,11 @@ export function loadOrCreateAccount(accountAddress: Bytes): Account {
 export function loadOrCreateTransaction(
   transactionId: Bytes,
   accountAddress: Bytes,
-  nft: NFT,
-  type: TransactionType
+  nft: NFT
 ): Transaction {
   let transaction = Transaction.load(transactionId.toHex());
 
-  if (transaction == null) {
+  if (!transaction) {
     transaction = new Transaction(transactionId.toHex());
     transaction.account = loadOrCreateAccount(accountAddress);
     transaction.from = Bytes.empty();
