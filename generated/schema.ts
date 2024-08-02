@@ -101,6 +101,40 @@ export class Account extends Entity {
     }
   }
 
+  get totalBought(): BigInt | null {
+    let value = this.get("totalBought");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set totalBought(value: BigInt | null) {
+    if (!value) {
+      this.unset("totalBought");
+    } else {
+      this.set("totalBought", Value.fromBigInt(<BigInt>value));
+    }
+  }
+
+  get totalSold(): BigInt | null {
+    let value = this.get("totalSold");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set totalSold(value: BigInt | null) {
+    if (!value) {
+      this.unset("totalSold");
+    } else {
+      this.set("totalSold", Value.fromBigInt(<BigInt>value));
+    }
+  }
+
   get totalBalance(): BigInt | null {
     let value = this.get("totalBalance");
     if (!value || value.kind == ValueKind.NULL) {
@@ -310,8 +344,8 @@ export class Transaction extends Entity {
     this.set("nft", Value.fromString(value));
   }
 
-  get amountSold(): BigInt | null {
-    let value = this.get("amountSold");
+  get nftSalePrice(): BigInt | null {
+    let value = this.get("nftSalePrice");
     if (!value || value.kind == ValueKind.NULL) {
       return null;
     } else {
@@ -319,16 +353,16 @@ export class Transaction extends Entity {
     }
   }
 
-  set amountSold(value: BigInt | null) {
+  set nftSalePrice(value: BigInt | null) {
     if (!value) {
-      this.unset("amountSold");
+      this.unset("nftSalePrice");
     } else {
-      this.set("amountSold", Value.fromBigInt(<BigInt>value));
+      this.set("nftSalePrice", Value.fromBigInt(<BigInt>value));
     }
   }
 
-  get totalAmountSold(): BigInt | null {
-    let value = this.get("totalAmountSold");
+  get totalSold(): BigInt | null {
+    let value = this.get("totalSold");
     if (!value || value.kind == ValueKind.NULL) {
       return null;
     } else {
@@ -336,42 +370,12 @@ export class Transaction extends Entity {
     }
   }
 
-  set totalAmountSold(value: BigInt | null) {
+  set totalSold(value: BigInt | null) {
     if (!value) {
-      this.unset("totalAmountSold");
+      this.unset("totalSold");
     } else {
-      this.set("totalAmountSold", Value.fromBigInt(<BigInt>value));
+      this.set("totalSold", Value.fromBigInt(<BigInt>value));
     }
-  }
-
-  get totalAmountBought(): BigInt | null {
-    let value = this.get("totalAmountBought");
-    if (!value || value.kind == ValueKind.NULL) {
-      return null;
-    } else {
-      return value.toBigInt();
-    }
-  }
-
-  set totalAmountBought(value: BigInt | null) {
-    if (!value) {
-      this.unset("totalAmountBought");
-    } else {
-      this.set("totalAmountBought", Value.fromBigInt(<BigInt>value));
-    }
-  }
-
-  get transactionCount(): BigInt {
-    let value = this.get("transactionCount");
-    if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
-    } else {
-      return value.toBigInt();
-    }
-  }
-
-  set transactionCount(value: BigInt) {
-    this.set("transactionCount", Value.fromBigInt(value));
   }
 
   get blockNumber(): BigInt {
@@ -398,6 +402,91 @@ export class Transaction extends Entity {
 
   set blockTimestamp(value: BigInt) {
     this.set("blockTimestamp", Value.fromBigInt(value));
+  }
+
+  get totalSalesVolume(): BigInt | null {
+    let value = this.get("totalSalesVolume");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set totalSalesVolume(value: BigInt | null) {
+    if (!value) {
+      this.unset("totalSalesVolume");
+    } else {
+      this.set("totalSalesVolume", Value.fromBigInt(<BigInt>value));
+    }
+  }
+
+  get averageSalePrice(): BigInt | null {
+    let value = this.get("averageSalePrice");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set averageSalePrice(value: BigInt | null) {
+    if (!value) {
+      this.unset("averageSalePrice");
+    } else {
+      this.set("averageSalePrice", Value.fromBigInt(<BigInt>value));
+    }
+  }
+
+  get totalSalesCount(): BigInt | null {
+    let value = this.get("totalSalesCount");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set totalSalesCount(value: BigInt | null) {
+    if (!value) {
+      this.unset("totalSalesCount");
+    } else {
+      this.set("totalSalesCount", Value.fromBigInt(<BigInt>value));
+    }
+  }
+
+  get highestSalePrice(): BigInt | null {
+    let value = this.get("highestSalePrice");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set highestSalePrice(value: BigInt | null) {
+    if (!value) {
+      this.unset("highestSalePrice");
+    } else {
+      this.set("highestSalePrice", Value.fromBigInt(<BigInt>value));
+    }
+  }
+
+  get lowestSalePrice(): BigInt | null {
+    let value = this.get("lowestSalePrice");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set lowestSalePrice(value: BigInt | null) {
+    if (!value) {
+      this.unset("lowestSalePrice");
+    } else {
+      this.set("lowestSalePrice", Value.fromBigInt(<BigInt>value));
+    }
   }
 }
 
@@ -1231,17 +1320,21 @@ export class Attribute extends Entity {
     }
   }
 
-  get maxValue(): i32 {
+  get maxValue(): BigInt | null {
     let value = this.get("maxValue");
     if (!value || value.kind == ValueKind.NULL) {
-      return 0;
+      return null;
     } else {
-      return value.toI32();
+      return value.toBigInt();
     }
   }
 
-  set maxValue(value: i32) {
-    this.set("maxValue", Value.fromI32(value));
+  set maxValue(value: BigInt | null) {
+    if (!value) {
+      this.unset("maxValue");
+    } else {
+      this.set("maxValue", Value.fromBigInt(<BigInt>value));
+    }
   }
 
   get nftMetadata(): string {

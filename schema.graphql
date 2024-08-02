@@ -33,12 +33,16 @@ type Transaction @entity {
   buyer: Bytes # The address of the buyer (for sales).
   seller: Bytes # The address of the seller (for sales).
   nft: NFT! # Reference to the NFT entity involved in this transaction.
-  amountSold: BigInt # The amount of the NFT sold (relevant for sales).
+  nftSalePrice: BigInt # The amount of the NFT sold (relevant for sales).
   totalSold: BigInt # The total amount of NFTs sold in this transaction (relevant for sales).
-  totalBought: BigInt # The total amount of NFTs bought in this transaction (relevant for sales).
-  transactionCount: BigInt!
   blockNumber: BigInt! # The block number when this transaction was recorded. Helps in tracking historical data.
   blockTimestamp: BigInt! # The timestamp of the block when this transaction was recorded. Provides a time reference.
+  # More aggregatedata fields
+  totalSalesVolume: BigInt # Aggregates the total amount sold across all transactions
+  averageSalePrice: BigInt # Calculates the average price of NFTs sold.
+  totalSalesCount: BigInt # Tracks the total number of NFT sales.
+  highestSalePrice: BigInt # Records the highest sale price of an NFT.
+  lowestSalePrice: BigInt # Records the lowest sale price of an NFT.
 }
 
 # Definition of the NFT entity
@@ -116,7 +120,7 @@ type Attribute @entity {
   traitType: String! # Type of the trait.
   value: String! # Value of the trait.
   displayType: String # Display type of the trait (if any).
-  maxValue: Int # Maximum value of the trait (if any).
+  maxValue: BigInt # Maximum value of the trait (if any).
   nftMetadata: NFTMetadata! # Reference to the NFTMetadata entity that this attribute belongs to.
 }
 
