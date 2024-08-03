@@ -1,7 +1,5 @@
-import { Address, BigInt, Bytes } from "@graphprotocol/graph-ts";
-import { Account, Transaction, NFT } from "../../generated/schema";
-import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
-import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
+import { BigInt, Bytes } from "@graphprotocol/graph-ts";
+import { Account } from "../../generated/schema";
 import { BIGINT_ONE, BIGINT_ZERO } from "./constant";
 
 // Enum for Transaction Types
@@ -42,6 +40,43 @@ export function getOrCreateAccount(accountAddress: Bytes): Account {
   }
 
   return account; // Return the loaded or newly created account entity
+}
+
+// Helper function to update account statistics
+export function updateAccountStatistics(
+  account: Account,
+  isMint: boolean,
+  isBuy: boolean = false, // Added parameter to track buy transactions
+  salePrice: BigInt | null = null // Optional sale price for sales or buys
+): void {
+  // If the transaction is a minting event
+  if (isMint) {
+    // Increment the mint count for the account
+    account.mintCount = (account.mintCount || BIGINT_ZERO).plus(BIGINT_ONE);
+  }
+  // If the transaction is a buy event
+  else if (isBuy) {
+    // Increment the buy count for the account
+    account.buyCount = (account.buyCount || BIGINT_ZERO).plus(BIGINT_ONE);
+    // Add the sale price to the total amount bought, if provided
+    if (salePrice) {
+      account.totalAmountBought = (
+        account.totalAmountBought || BIGINT_ZERO
+      ).plus(salePrice);
+    }
+  }
+  // If the transaction is a sale event and a sale price is provided
+  else if (salePrice) {
+    // Increment the sale count for the account
+    account.saleCount = (account.saleCount || BIGINT_ZERO).plus(BIGINT_ONE);
+    // Add the sale price to the total amount sold
+    account.totalAmountSold = (account.totalAmountSold || BIGINT_ZERO).plus(
+      salePrice
+    );
+  }
+
+  // Save the updated account entity
+  account.save();
 }
 
 // Function to update account types based on their activities
