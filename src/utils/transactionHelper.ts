@@ -1,43 +1,14 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts";
-import { Account, Transaction } from "../../generated/schema";
+import { Account, Transaction, NFT } from "../../generated/schema";
 import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
 import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
+import { loadOrCreateAccount } from "./logic";
+import { BIGINT_ZERO, BIGINT_ONE } from "./constant";
 
 // Enum for Transaction Types
 export enum TransactionType {
-  SALE = "SALE", // Represents a sale transaction
-  MINT = "MINT", // Represents a minting transaction
-  BUY = "BUY", // Represents a buy transaction
-}
-
-// Helper function to load or create an Account entity
-export function loadOrCreateAccount(accountAddress: Bytes): Account {
-  let account = Account.load(accountAddress.toHex());
-
-  if (!account) {
-    account = new Account(accountAddress.toHex());
-    account.buyCount = BigInt.fromI32(0);
-    account.saleCount = BigInt.fromI32(0);
-    account.mintCount = BigInt.fromI32(0);
-    account.totalBought = BigInt.fromI32(0);
-    account.totalSold = BigInt.fromI32(0);
-    account.totalBalance = BigInt.fromI32(0);
-    account.blockNumber = BigInt.fromI32(0);
-    account.blockTimestamp = BigInt.fromI32(0);
-    account.save();
-  } else {
-    // Provide default values if fields are null
-    account.buyCount = account.buyCount || BigInt.fromI32(0);
-    account.saleCount = account.saleCount || BigInt.fromI32(0);
-    account.mintCount = account.mintCount || BigInt.fromI32(0);
-    account.totalBought = account.totalBought || BigInt.fromI32(0);
-    account.totalSold = account.totalSold || BigInt.fromI32(0);
-    account.totalBalance = account.totalBalance || BigInt.fromI32(0);
-    account.blockNumber = account.blockNumber || BigInt.fromI32(0);
-    account.blockTimestamp = account.blockTimestamp || BigInt.fromI32(0);
-  }
-
-  return account as Account;
+  TRADE = "TRADE",
+  MINT = "MINT",
 }
 
 // Helper function to load or create a Transaction entity
@@ -46,69 +17,76 @@ export function loadOrCreateTransaction(
   accountId: string,
   type: TransactionType
 ): Transaction {
-  let transaction = new Transaction(id);
-  transaction.account = accountId;
-  transaction.type = type;
-  transaction.from = Bytes.empty();
-  transaction.to = Bytes.empty();
-  transaction.tokenId = BigInt.fromI32(0);
-  transaction.buyer = Bytes.empty();
-  transaction.seller = Bytes.empty();
-  transaction.nft = "";
-  transaction.nftSalePrice = BigInt.fromI32(0);
-  transaction.totalSold = BigInt.fromI32(0);
-  transaction.blockNumber = BigInt.fromI32(0);
-  transaction.blockTimestamp = BigInt.fromI32(0);
+  // Attempt to load the transaction entity by its ID
+  let transaction = Transaction.load(id);
 
-  transaction.totalSalesVolume = BigInt.fromI32(0);
-  transaction.averageSalePrice = BigInt.fromI32(0);
-  transaction.totalSalesCount = BigInt.fromI32(0);
-  transaction.highestSalePrice = BigInt.fromI32(0);
-  transaction.lowestSalePrice = BigInt.fromI32(0);
-  transaction.save();
-
-  return transaction;
-}
-
-// Event handler for Transfer events
-export function handleTransfer(event: TransferEvent): void {
-  let fromAccount = loadOrCreateAccount(event.params.from);
-  let toAccount = loadOrCreateAccount(event.params.to);
-  let tokenId = event.params.tokenId.toHex();
-  let transactionId = event.transaction.hash.toHex() + "-" + tokenId;
-
-  let transactionType: TransactionType;
-
-  // Check if the from address is a mint address (zero address)
-  if (
-    event.params.from.toHex() == "0x0000000000000000000000000000000000000000"
-  ) {
-    transactionType = TransactionType.MINT;
-  } else {
-    transactionType = TransactionType.SALE;
+  if (!transaction) {
+    // Create a new transaction entity if it does not exist
+    transaction = new Transaction(id);
+    transaction.account = accountId; // Set the account ID
+    transaction.type = type; // Set the transaction type (MINT or TRADE)
+    transaction.from = Bytes.empty(); // Initialize 'from' address
+    transaction.to = Bytes.empty(); // Initialize 'to' address
+    transaction.tokenId = BigInt.fromI32(0); // Initialize token ID
+    transaction.buyer = Bytes.empty(); // Initialize buyer address
+    transaction.seller = Bytes.empty(); // Initialize seller address
+    transaction.nft = ""; // Initialize NFT information
+    transaction.nftSalePrice = BigInt.fromI32(0); // Initialize sale price
+    transaction.totalSold = BigInt.fromI32(0); // Initialize total sold amount
+    transaction.blockNumber = BigInt.fromI32(0); // Initialize block number
+    transaction.blockTimestamp = BigInt.fromI32(0); // Initialize block timestamp
+    transaction.totalSalesVolume = BigInt.fromI32(0); // Initialize total sales volume
+    transaction.averageSalePrice = BigInt.fromI32(0); // Initialize average sale price
+    transaction.totalSalesCount = BigInt.fromI32(0); // Initialize total sales count
+    transaction.highestSalePrice = BigInt.fromI32(0); // Initialize highest sale price
+    transaction.lowestSalePrice = BigInt.fromI32(0); // Initialize lowest sale price
+    transaction.save(); // Save the new transaction entity
   }
 
+  return transaction; // Return the loaded or newly created transaction entity
+}
+
+// Event handler for Transfer events from the NFT contract
+export function handleTransfer(event: TransferEvent): void {
+  // Load or create account entities for 'from' and 'to' addresses
+  let fromAccount = loadOrCreateAccount(event.params.from);
+  let toAccount = loadOrCreateAccount(event.params.to);
+
+  // Get the token ID from the event parameters
+  let tokenId = event.params.tokenId.toHex();
+
+  // Generate a unique transaction ID based on the transaction hash and token ID
+  let transactionId = event.transaction.hash.toHex() + "-" + tokenId;
+
+  // Determine the type of transaction (MINT if 'from' is zero address, otherwise TRADE)
+  let transactionType: TransactionType = event.params.from.equals(
+    Bytes.fromHexString("0x0000000000000000000000000000000000000000")
+  )
+    ? TransactionType.MINT
+    : TransactionType.TRADE;
+
+  // Create or update transaction entity
   let transaction = loadOrCreateTransaction(
     transactionId,
-    fromAccount.id,
+    toAccount.id,
     transactionType
   );
+
+  // Set transaction details from event parameters
   transaction.from = event.params.from;
   transaction.to = event.params.to;
   transaction.tokenId = event.params.tokenId;
   transaction.blockNumber = event.block.number;
   transaction.blockTimestamp = event.block.timestamp;
 
+  // Update account statistics based on transaction type
   if (transactionType == TransactionType.MINT) {
-    toAccount.mintCount = toAccount.mintCount.plus(BigInt.fromI32(1));
-    toAccount.totalBalance = toAccount.totalBalance.plus(BigInt.fromI32(1));
-  } else {
-    fromAccount.totalBalance = fromAccount.totalBalance.minus(
+    toAccount.mintCount = (toAccount.mintCount || BigInt.fromI32(0)).plus(
       BigInt.fromI32(1)
     );
-    toAccount.totalBalance = toAccount.totalBalance.plus(BigInt.fromI32(1));
   }
 
+  // Save the updated account and transaction entities
   fromAccount.save();
   toAccount.save();
   transaction.save();
@@ -116,13 +94,11 @@ export function handleTransfer(event: TransferEvent): void {
 
 // Event handler for OrdersMatched events
 export function handleOrdersMatched(event: OrdersMatchedEvent): void {
-  // Identify the buyer and seller based on the fee recipient
   let buyerAddress = event.params.taker;
   let sellerAddress = event.params.maker;
 
   if (
-    event.params.feeRecipient.toHex() !=
-    "0x0000000000000000000000000000000000000000"
+    event.params.maker.toHex() != "0x0000000000000000000000000000000000000000"
   ) {
     buyerAddress = event.params.taker;
     sellerAddress = event.params.maker;
@@ -137,7 +113,7 @@ export function handleOrdersMatched(event: OrdersMatchedEvent): void {
   let transaction = loadOrCreateTransaction(
     transactionId,
     buyerAccount.id,
-    TransactionType.BUY
+    TransactionType.TRADE
   );
   transaction.buyer = buyerAddress;
   transaction.seller = sellerAddress;
@@ -146,22 +122,19 @@ export function handleOrdersMatched(event: OrdersMatchedEvent): void {
   transaction.blockNumber = event.block.number;
   transaction.blockTimestamp = event.block.timestamp;
 
-  buyerAccount.buyCount = buyerAccount.buyCount.plus(BigInt.fromI32(1));
-  buyerAccount.totalBought = buyerAccount.totalBought.plus(salePrice);
-  sellerAccount.saleCount = sellerAccount.saleCount.plus(BigInt.fromI32(1));
-  sellerAccount.totalSold = sellerAccount.totalSold.plus(salePrice);
+  transaction.totalSalesVolume = (
+    transaction.totalSalesVolume || BigInt.fromI32(0)
+  ).plus(salePrice);
+  transaction.totalSalesCount = (
+    transaction.totalSalesCount || BigInt.fromI32(0)
+  ).plus(BigInt.fromI32(1));
 
-  transaction.totalSalesVolume = transaction.totalSalesVolume.plus(salePrice);
-  transaction.totalSalesCount = transaction.totalSalesCount.plus(
-    BigInt.fromI32(1)
-  );
-
-  if (salePrice.gt(transaction.highestSalePrice)) {
+  if (salePrice.gt(transaction.highestSalePrice || BigInt.fromI32(0))) {
     transaction.highestSalePrice = salePrice;
   }
   if (
-    salePrice.lt(transaction.lowestSalePrice) ||
-    transaction.lowestSalePrice.equals(BigInt.fromI32(0))
+    salePrice.lt(transaction.lowestSalePrice || BigInt.fromI32(0)) ||
+    (transaction.lowestSalePrice || BigInt.fromI32(0)).equals(BigInt.fromI32(0))
   ) {
     transaction.lowestSalePrice = salePrice;
   }

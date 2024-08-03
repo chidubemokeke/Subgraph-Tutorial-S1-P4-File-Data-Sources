@@ -101,8 +101,73 @@ export class Account extends Entity {
     }
   }
 
-  get totalBought(): BigInt | null {
-    let value = this.get("totalBought");
+  get isOG(): boolean {
+    let value = this.get("isOG");
+    if (!value || value.kind == ValueKind.NULL) {
+      return false;
+    } else {
+      return value.toBoolean();
+    }
+  }
+
+  set isOG(value: boolean) {
+    this.set("isOG", Value.fromBoolean(value));
+  }
+
+  get isCollector(): boolean {
+    let value = this.get("isCollector");
+    if (!value || value.kind == ValueKind.NULL) {
+      return false;
+    } else {
+      return value.toBoolean();
+    }
+  }
+
+  set isCollector(value: boolean) {
+    this.set("isCollector", Value.fromBoolean(value));
+  }
+
+  get isHunter(): boolean {
+    let value = this.get("isHunter");
+    if (!value || value.kind == ValueKind.NULL) {
+      return false;
+    } else {
+      return value.toBoolean();
+    }
+  }
+
+  set isHunter(value: boolean) {
+    this.set("isHunter", Value.fromBoolean(value));
+  }
+
+  get isFarmer(): boolean {
+    let value = this.get("isFarmer");
+    if (!value || value.kind == ValueKind.NULL) {
+      return false;
+    } else {
+      return value.toBoolean();
+    }
+  }
+
+  set isFarmer(value: boolean) {
+    this.set("isFarmer", Value.fromBoolean(value));
+  }
+
+  get isTrader(): boolean {
+    let value = this.get("isTrader");
+    if (!value || value.kind == ValueKind.NULL) {
+      return false;
+    } else {
+      return value.toBoolean();
+    }
+  }
+
+  set isTrader(value: boolean) {
+    this.set("isTrader", Value.fromBoolean(value));
+  }
+
+  get totalAmountBought(): BigInt | null {
+    let value = this.get("totalAmountBought");
     if (!value || value.kind == ValueKind.NULL) {
       return null;
     } else {
@@ -110,16 +175,16 @@ export class Account extends Entity {
     }
   }
 
-  set totalBought(value: BigInt | null) {
+  set totalAmountBought(value: BigInt | null) {
     if (!value) {
-      this.unset("totalBought");
+      this.unset("totalAmountBought");
     } else {
-      this.set("totalBought", Value.fromBigInt(<BigInt>value));
+      this.set("totalAmountBought", Value.fromBigInt(<BigInt>value));
     }
   }
 
-  get totalSold(): BigInt | null {
-    let value = this.get("totalSold");
+  get totalAmountSold(): BigInt | null {
+    let value = this.get("totalAmountSold");
     if (!value || value.kind == ValueKind.NULL) {
       return null;
     } else {
@@ -127,16 +192,16 @@ export class Account extends Entity {
     }
   }
 
-  set totalSold(value: BigInt | null) {
+  set totalAmountSold(value: BigInt | null) {
     if (!value) {
-      this.unset("totalSold");
+      this.unset("totalAmountSold");
     } else {
-      this.set("totalSold", Value.fromBigInt(<BigInt>value));
+      this.set("totalAmountSold", Value.fromBigInt(<BigInt>value));
     }
   }
 
-  get totalBalance(): BigInt | null {
-    let value = this.get("totalBalance");
+  get totalAmountBalance(): BigInt | null {
+    let value = this.get("totalAmountBalance");
     if (!value || value.kind == ValueKind.NULL) {
       return null;
     } else {
@@ -144,11 +209,11 @@ export class Account extends Entity {
     }
   }
 
-  set totalBalance(value: BigInt | null) {
+  set totalAmountBalance(value: BigInt | null) {
     if (!value) {
-      this.unset("totalBalance");
+      this.unset("totalAmountBalance");
     } else {
-      this.set("totalBalance", Value.fromBigInt(<BigInt>value));
+      this.set("totalAmountBalance", Value.fromBigInt(<BigInt>value));
     }
   }
 
@@ -635,6 +700,19 @@ export class NFT extends Entity {
 
   set mintCount(value: BigInt) {
     this.set("mintCount", Value.fromBigInt(value));
+  }
+
+  get activityCount(): BigInt {
+    let value = this.get("activityCount");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set activityCount(value: BigInt) {
+    this.set("activityCount", Value.fromBigInt(value));
   }
 
   get transfers(): TransactionLoader {
