@@ -12,6 +12,7 @@ import {
   getGlobalId,
   getOrCreateMintEvent,
   getOrCreateCovenToken,
+  getTokenIdFromMint,
 } from "./tokenHelper";
 
 // Enum for Transaction Types
@@ -39,7 +40,7 @@ export function loadOrCreateTransaction(
     transaction.to = Bytes.empty(); // Initialize 'to' address
     transaction.buyer = Bytes.empty(); // Initialize buyer address
     transaction.seller = Bytes.empty(); // Initialize seller address
-    transaction.nft = transaction.id; // Initialize NFT information
+    transaction.tokenId = BIGINT_ZERO; // Initialize NFT information
     transaction.nftSalePrice = BIGINT_ZERO; // Initialize sale price
     transaction.totalSold = BIGINT_ZERO; // Initialize total sold amount
     transaction.blockNumber = BIGINT_ZERO; // Initialize block number
@@ -68,7 +69,7 @@ export function handleTransfer(event: TransferEvent): void {
   mintEvent.save(); // Save the updated MintEvent entity
 
   // Generate a unique transaction ID based on the transaction hash and token ID
-  let transactionId = getGlobalId(event); // Create a unique ID
+  let transactionId = event.transaction.hash.toHex() + "-" + tokenId; // Create a unique ID
 
   // Determine the type of transaction (MINT if 'from' is zero address, otherwise TRADE)
   let transactionType: TransactionType = event.params.from.equals(ZERO_ADDRESS) // Check if the sender address is the zero address
@@ -87,6 +88,7 @@ export function handleTransfer(event: TransferEvent): void {
   transaction.from = event.params.from; // Set the 'from' address
   transaction.to = event.params.to; // Set the 'to' address
   transaction.tokenId = event.params.tokenId; // Set the token ID
+  transaction.nft = transaction.id; //
   transaction.blockNumber = event.block.number; // Set the block number
   transaction.blockTimestamp = event.block.timestamp; // Set the block timestamp
 
@@ -103,6 +105,9 @@ export function handleTransfer(event: TransferEvent): void {
 
 // Event handler for OrdersMatched events
 export function handleOrdersMatched(event: OrdersMatchedEvent): void {
+  // Get the token ID from the MintEvent parameters
+  let tokenId = getTokenIdFromMint(event);
+
   // Determine buyer and seller addresses
   let buyerAddress = event.params.taker; // Initially set the buyer address to the taker address from the event parameters
   let sellerAddress = event.params.maker; // Initially set the seller address to the maker address from the event parameters
@@ -116,9 +121,6 @@ export function handleOrdersMatched(event: OrdersMatchedEvent): void {
   // Load or create account entities for buyer and seller
   let buyerAccount = getOrCreateAccount(buyerAddress); // Get or create the account entity for the buyer
   let sellerAccount = getOrCreateAccount(sellerAddress); // Get or create the account entity for the seller
-
-  // Get the token ID from the event parameters
-  let tokenId = event.params.tokenId.toHex(); // Convert the token ID to a hexadecimal string
 
   // Get the sale price from the event parameters
   let salePrice = event.params.price; // Get the sale price from the event parameters
