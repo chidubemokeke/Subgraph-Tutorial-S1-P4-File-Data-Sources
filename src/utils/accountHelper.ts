@@ -1,5 +1,5 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts";
-import { Account } from "../../generated/schema";
+import { Account, Transaction } from "../../generated/schema";
 import { BIGINT_ONE, BIGINT_ZERO } from "./constant";
 
 // Enum for Transaction Types
@@ -118,4 +118,43 @@ export function updateAccountTypes(account: Account): void {
   account.isTrader =
     mintCount.equals(BIGINT_ZERO) && // Must not have minted any NFTs
     (buyCount.gt(BIGINT_ZERO) || saleCount.gt(BIGINT_ZERO)); // Must have bought or sold at least one NFT
+}
+
+// Helper function to update transaction statistics
+export function updateTransactionStatistics(
+  transaction: Transaction,
+  salePrice: BigInt
+): void {
+  // Update the total sales volume by adding the current sale price
+  transaction.totalSalesVolume = (
+    transaction.totalSalesVolume || BIGINT_ZERO
+  ).plus(salePrice);
+
+  // Increment the total sales count by one
+  transaction.totalSalesCount = (
+    transaction.totalSalesCount || BIGINT_ZERO
+  ).plus(BIGINT_ONE);
+
+  // If the sale price is greater than the current highest sale price, update it
+  if (salePrice.gt(transaction.highestSalePrice || BIGINT_ZERO)) {
+    transaction.highestSalePrice = salePrice;
+  }
+
+  // If the sale price is less than the current lowest sale price or if it's the first sale, update it
+  if (
+    salePrice.lt(transaction.lowestSalePrice || BIGINT_ZERO) ||
+    (transaction.lowestSalePrice || BIGINT_ZERO).equals(BIGINT_ZERO)
+  ) {
+    transaction.lowestSalePrice = salePrice;
+  }
+
+  // Calculate the average sale price if there are any sales
+  if (transaction.totalSalesCount.gt(BIGINT_ZERO)) {
+    transaction.averageSalePrice = transaction.totalSalesVolume.div(
+      transaction.totalSalesCount
+    );
+  }
+
+  // Save the updated transaction entity
+  transaction.save();
 }

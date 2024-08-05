@@ -27,6 +27,14 @@ type Account @entity {
   transactions: [Transaction!]! @derivedFrom(field: "account") # List of transactions associated with this account.
 }
 
+# The CovenToken entity represents a minted token.
+type CovenToken @entity {
+  id: ID! # Unique identifier for the token (combination of contract address and tokenId).
+  tokenId: BigInt! # The ID of the token.
+  contractAddress: Bytes! # The address of the contract where the token was minted.
+  owner: Bytes! # The current owner of the token.
+}
+
 # Definition of the Transaction entity
 type Transaction @entity {
   id: ID! # A unique identifier for each transaction.
@@ -50,19 +58,26 @@ type Transaction @entity {
   lowestSalePrice: BigInt # Records the lowest sale price of an NFT.
 }
 
+# Temporary entity to hold CryptoCoven tokenId from TransferEvent in the logIndex of the ordersMatched event.
+type TransferEvent @entity {
+  id: ID! # Unique identifier (transaction hash + log index).
+  tokenId: BigInt! # The ID of the token.
+  contractAddress: Bytes! # The address of the contract.
+}
+
 # Definition of the NFT entity
 type NFT @entity {
   id: ID! # A unique identifier for each NFT.
+  contractAddress: Bytes!
   currentOwner: Account! # Reference to the Account entity that currently owns this NFT.
   tokenID: BigInt! # The unique identifier of the NFT.
   tokenURI: String! # The URI pointing to the metadata of the NFT.
   ipfsURI: NFTMetadata # Reference to additional metadata for the NFT stored in IPFS.
-  firstOwner: Bytes! # The address of the first owner of this NFT.
   saleCount: BigInt! # The total number of times this NFT has been sold.
   buyCount: BigInt! # The total number of times this NFT has been bought.
   mintCount: BigInt! # The total number of times this NFT has been minted.
   activityCount: BigInt! # The total number of transactions for this NFT bought, sold, mint.
-  transfers: [Transaction!]! @derivedFrom(field: "nft") # List of all transactions involving this NFT.
+  transactions: [Transaction!]! @derivedFrom(field: "nft") # List of all transactions involving this NFT.
   blockTimestamp: BigInt! # The timestamp of the block when this NFT was last updated. Provides a time reference.
   blockNumber: BigInt! # The block number when this NFT was last updated. Helps in tracking historical changes.
 }

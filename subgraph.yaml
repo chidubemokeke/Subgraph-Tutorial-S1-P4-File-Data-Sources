@@ -17,6 +17,7 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - Account
+        - TransferEvent
         - Transaction
         - NFT
       abis:
@@ -40,6 +41,7 @@ dataSources:
       entities:
         - Account
         - Transaction
+        - TransferEvent
         - NFT
       abis:
         - name: Opensea

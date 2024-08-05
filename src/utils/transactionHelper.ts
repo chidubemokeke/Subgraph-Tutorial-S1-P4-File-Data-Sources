@@ -1,21 +1,18 @@
-import { BigInt, Bytes } from "@graphprotocol/graph-ts";
-// Import necessary types from The Graph protocol
-
-import { Account, Transaction, NFT } from "../../generated/schema";
-// Import schema entities: Account, Transaction, and NFT
-
+import { BigInt, Bytes, ethereum } from "@graphprotocol/graph-ts";
+import { Transaction, CovenToken } from "../../generated/schema";
 import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
-// Import Transfer event type from CryptoCoven contract
-
 import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
-// Import OrdersMatched event type from Opensea contract
-
-import { getOrCreateAccount, updateAccountTypes } from "../utils/accountHelper";
-// Import helper function to get or create an Account entity
-
+import {
+  getOrCreateAccount,
+  updateAccountTypes,
+  updateTransactionStatistics,
+} from "../utils/accountHelper";
 import { BIGINT_ZERO, BIGINT_ONE, ZERO_ADDRESS } from "./constant";
-import { updateTransactionStatistics } from "./logic";
-// Import constants used in the code
+import {
+  getGlobalId,
+  getOrCreateMintEvent,
+  getOrCreateCovenToken,
+} from "./tokenHelper";
 
 // Enum for Transaction Types
 export enum TransactionType {
@@ -40,19 +37,18 @@ export function loadOrCreateTransaction(
     transaction.type = type; // Set the transaction type (MINT or TRADE)
     transaction.from = Bytes.empty(); // Initialize 'from' address
     transaction.to = Bytes.empty(); // Initialize 'to' address
-    transaction.tokenId = BigInt.fromI32(0); // Initialize token ID
     transaction.buyer = Bytes.empty(); // Initialize buyer address
     transaction.seller = Bytes.empty(); // Initialize seller address
-    transaction.nft = ""; // Initialize NFT information
-    transaction.nftSalePrice = BigInt.fromI32(0); // Initialize sale price
-    transaction.totalSold = BigInt.fromI32(0); // Initialize total sold amount
-    transaction.blockNumber = BigInt.fromI32(0); // Initialize block number
-    transaction.blockTimestamp = BigInt.fromI32(0); // Initialize block timestamp
-    transaction.totalSalesVolume = BigInt.fromI32(0); // Initialize total sales volume
-    transaction.averageSalePrice = BigInt.fromI32(0); // Initialize average sale price
-    transaction.totalSalesCount = BigInt.fromI32(0); // Initialize total sales count
-    transaction.highestSalePrice = BigInt.fromI32(0); // Initialize highest sale price
-    transaction.lowestSalePrice = BigInt.fromI32(0); // Initialize lowest sale price
+    transaction.nft = transaction.id; // Initialize NFT information
+    transaction.nftSalePrice = BIGINT_ZERO; // Initialize sale price
+    transaction.totalSold = BIGINT_ZERO; // Initialize total sold amount
+    transaction.blockNumber = BIGINT_ZERO; // Initialize block number
+    transaction.blockTimestamp = BIGINT_ZERO; // Initialize block timestamp
+    transaction.totalSalesVolume = BIGINT_ZERO; // Initialize total sales volume
+    transaction.averageSalePrice = BIGINT_ZERO; // Initialize average sale price
+    transaction.totalSalesCount = BIGINT_ZERO; // Initialize total sales count
+    transaction.highestSalePrice = BIGINT_ZERO; // Initialize highest sale price
+    transaction.lowestSalePrice = BIGINT_ZERO; // Initialize lowest sale price
     transaction.save(); // Save the new transaction entity
   }
 
@@ -64,11 +60,15 @@ export function handleTransfer(event: TransferEvent): void {
   let fromAccount = getOrCreateAccount(event.params.from); // Get or create the account entity for the sender
   let toAccount = getOrCreateAccount(event.params.to); // Get or create the account entity for the recipient
 
-  // Get the token ID from the event parameters
-  let tokenId = event.params.tokenId.toHex(); // Convert the token ID to a hexadecimal string
+  // Get or create a MintEvent entity based on the Transfer event
+  let mintEvent = getOrCreateMintEvent(event);
+
+  let tokenId = event.params.tokenId; // Get the tokenId from the event
+  mintEvent.tokenId = tokenId; // Set the tokenId in the MintEvent entity
+  mintEvent.save(); // Save the updated MintEvent entity
 
   // Generate a unique transaction ID based on the transaction hash and token ID
-  let transactionId = event.transaction.hash.toHex() + "-" + tokenId; // Create a unique ID by concatenating the transaction hash and token ID
+  let transactionId = getGlobalId(event); // Create a unique ID
 
   // Determine the type of transaction (MINT if 'from' is zero address, otherwise TRADE)
   let transactionType: TransactionType = event.params.from.equals(ZERO_ADDRESS) // Check if the sender address is the zero address

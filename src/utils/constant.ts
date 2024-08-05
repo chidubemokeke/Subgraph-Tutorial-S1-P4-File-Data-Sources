@@ -5,3 +5,4 @@ export const BIGINT_ONE = BigInt.fromI32(1);
 export const ZERO_ADDRESS = Bytes.fromHexString(
   "0x0000000000000000000000000000000000000000"
 );
+export const CRYPTOCOVEN_ADDRESS = "0x5180db8F5c931aaE63c74266b211F580155ecac8";
