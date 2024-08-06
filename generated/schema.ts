@@ -634,7 +634,7 @@ export class Transaction extends Entity {
   }
 }
 
-export class TransferEvent extends Entity {
+export class TokenEvent extends Entity {
   constructor(id: string) {
     super();
     this.set("id", Value.fromString(id));
@@ -642,24 +642,22 @@ export class TransferEvent extends Entity {
 
   save(): void {
     let id = this.get("id");
-    assert(id != null, "Cannot save TransferEvent entity without an ID");
+    assert(id != null, "Cannot save TokenEvent entity without an ID");
     if (id) {
       assert(
         id.kind == ValueKind.STRING,
-        `Entities of type TransferEvent must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
+        `Entities of type TokenEvent must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
       );
-      store.set("TransferEvent", id.toString(), this);
+      store.set("TokenEvent", id.toString(), this);
     }
   }
 
-  static loadInBlock(id: string): TransferEvent | null {
-    return changetype<TransferEvent | null>(
-      store.get_in_block("TransferEvent", id),
-    );
+  static loadInBlock(id: string): TokenEvent | null {
+    return changetype<TokenEvent | null>(store.get_in_block("TokenEvent", id));
   }
 
-  static load(id: string): TransferEvent | null {
-    return changetype<TransferEvent | null>(store.get("TransferEvent", id));
+  static load(id: string): TokenEvent | null {
+    return changetype<TokenEvent | null>(store.get("TokenEvent", id));
   }
 
   get id(): string {

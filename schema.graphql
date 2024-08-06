@@ -59,7 +59,7 @@ type Transaction @entity {
 }
 
 # Temporary entity to hold CryptoCoven tokenId from TransferEvent in the logIndex of the ordersMatched event.
-type TransferEvent @entity {
+type TokenEvent @entity {
   id: ID! # Unique identifier (transaction hash + log index).
   tokenId: BigInt! # The ID of the token.
   contractAddress: Bytes! # The address of the contract.

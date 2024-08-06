@@ -1,8 +1,8 @@
 import { BigInt, ethereum, Bytes } from "@graphprotocol/graph-ts";
-import { TransferEvent as MintEvent, CovenToken } from "../../generated/schema";
+import { TokenEvent, CovenToken } from "../../generated/schema";
 import { BIGINT_ONE } from "./constant";
 
-// Helper function to generate a unique ID for entities
+// Helper function to generate a unique ID for tracking log indices
 export function getGlobalId(event: ethereum.Event): string {
   // Get the transaction hash as a hexadecimal string
   let globalId = event.transaction.hash
@@ -14,28 +14,28 @@ export function getGlobalId(event: ethereum.Event): string {
   return globalId; // Return the generated globalId
 }
 
-// Helper function to get or create a MintEvent from a TransferEvent entity in the CryptoCoven Contract
-export function getOrCreateMintEvent(event: ethereum.Event): MintEvent {
+// Helper function to get or create a MintEvent/TransferEvent entity in the CryptoCoven Contract
+export function getOrCreateTokenEvent(event: ethereum.Event): TokenEvent {
   let id = getGlobalId(event);
-  let mintEvent = MintEvent.load(id);
-  if (!mintEvent) {
-    mintEvent = new MintEvent(id);
-    mintEvent.contractAddress = event.address;
-    mintEvent.tokenId = BigInt.zero(); // Initialize with zero, will be updated later
-    mintEvent.save();
+  let tokenEvent = TokenEvent.load(id);
+  if (!tokenEvent) {
+    tokenEvent = new TokenEvent(id);
+    tokenEvent.contractAddress = event.address;
+    tokenEvent.tokenId = BigInt.zero(); // Initialize with zero, will be updated later
+    tokenEvent.save();
   }
-  return mintEvent as MintEvent;
+  return tokenEvent as TokenEvent;
 }
 
 // Helper function to get tokenId from MintEvent
-export function getTokenIdFromMint(event: ethereum.Event): BigInt | null {
+export function getTokenId(event: ethereum.Event): BigInt | null {
   let previousLogIndex = event.logIndex.minus(BIGINT_ONE);
   let id = event.transaction.hash
     .toHexString()
     .concat("-")
     .concat(previousLogIndex.toString());
-  let mintEvent = MintEvent.load(id);
-  return mintEvent ? mintEvent.tokenId : null;
+  let tokenEvent = TokenEvent.load(id);
+  return tokenEvent ? tokenEvent.tokenId : null;
 }
 
 // Load or create an NFT entity based on tokenId and contractAddress
@@ -53,12 +53,12 @@ export function getOrCreateCovenToken(
   return nft;
 }
 // Helper function to get owner from previous TransferEvent
-export function getOwnerFromTransferEvent(event: ethereum.Event): Bytes | null {
+export function getTokenOwner(event: ethereum.Event): Bytes | null {
   let previousLogIndex = event.logIndex.minus(BigInt.fromI32(1));
   let id = event.transaction.hash
     .toHexString()
     .concat("-")
     .concat(previousLogIndex.toString());
-  let mintEvent = MintEvent.load(id);
-  return mintEvent ? mintEvent.contractAddress : null;
+  let tokenEvent = TokenEvent.load(id);
+  return tokenEvent ? tokenEvent.contractAddress : null;
 }
