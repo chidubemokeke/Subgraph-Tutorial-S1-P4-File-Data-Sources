@@ -18,7 +18,6 @@ export function initializeNFT(id: string, ownerId: string): NFT {
   nft.tokenID = BigInt.fromI32(0); // NFT token ID
   nft.tokenURI = ""; // URI pointing to NFT metadata
   nft.ipfsURI = ""; // URI pointing to IPFS metadata (NFTMetadata reference)
-  nft.firstOwner = Bytes.empty(); // Placeholder for initial owner address
   nft.saleCount = BigInt.fromI32(0); // Number of times the NFT has been sold
   nft.buyCount = BigInt.fromI32(0); // Number of times the NFT has been bought
   nft.mintCount = BigInt.fromI32(0); // Number of times the NFT has been minted

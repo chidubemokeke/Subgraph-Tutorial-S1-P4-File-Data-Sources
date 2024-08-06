@@ -1,6 +1,8 @@
-import { BigInt, ethereum, Bytes } from "@graphprotocol/graph-ts";
-import { TokenEvent, CovenToken } from "../../generated/schema";
+import { BigInt, ethereum, Bytes, bigInt } from "@graphprotocol/graph-ts";
+import { TokenEvent } from "../../generated/schema";
 import { BIGINT_ONE } from "./constant";
+import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
+import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
 
 // Helper function to generate a unique ID for tracking log indices
 export function getGlobalId(event: ethereum.Event): string {
@@ -15,20 +17,21 @@ export function getGlobalId(event: ethereum.Event): string {
 }
 
 // Helper function to get or create a MintEvent/TransferEvent entity in the CryptoCoven Contract
-export function getOrCreateTokenEvent(event: ethereum.Event): TokenEvent {
+export function getOrCreateToken(event: TransferEvent): TokenEvent {
   let id = getGlobalId(event);
   let tokenEvent = TokenEvent.load(id);
+
   if (!tokenEvent) {
     tokenEvent = new TokenEvent(id);
     tokenEvent.contractAddress = event.address;
-    tokenEvent.tokenId = BigInt.zero(); // Initialize with zero, will be updated later
+    tokenEvent.tokenId = BigInt.fromI32(0); // Initialize with zero, will be updated later
     tokenEvent.save();
   }
-  return tokenEvent as TokenEvent;
+  return tokenEvent;
 }
 
 // Helper function to get tokenId from MintEvent
-export function getTokenId(event: ethereum.Event): BigInt | null {
+export function getTokenId(event: OrdersMatchedEvent): BigInt | null {
   let previousLogIndex = event.logIndex.minus(BIGINT_ONE);
   let id = event.transaction.hash
     .toHexString()
@@ -38,20 +41,6 @@ export function getTokenId(event: ethereum.Event): BigInt | null {
   return tokenEvent ? tokenEvent.tokenId : null;
 }
 
-// Load or create an NFT entity based on tokenId and contractAddress
-export function getOrCreateCovenToken(
-  tokenId: BigInt,
-  contractAddress: Bytes
-): CovenToken {
-  let nft = CovenToken.load(tokenId.toHex()); // Load NFT entity using tokenId
-  if (!nft) {
-    nft = new CovenToken(tokenId.toHex()); // Create a new NFT entity if it doesn't exist
-    nft.tokenId = tokenId;
-    nft.contractAddress = contractAddress;
-    nft.save(); // Save the new NFT entity
-  }
-  return nft;
-}
 // Helper function to get owner from previous TransferEvent
 export function getTokenOwner(event: ethereum.Event): Bytes | null {
   let previousLogIndex = event.logIndex.minus(BigInt.fromI32(1));

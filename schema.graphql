@@ -23,12 +23,12 @@ type Account @entity {
   totalAmountBalance: BigInt # The total balance of the account in terms of cryptocurrency.
   blockNumber: BigInt! # The block number when this entity was last updated. Helps in tracking historical changes.
   blockTimestamp: BigInt! # The timestamp of the block when this entity was last updated. Provides a time reference.
-  nfts: [NFT!]! @derivedFrom(field: "currentOwner") # List of NFTs currently owned by this account.
+  # nfts: [NFT!]! @derivedFrom(field: "currentOwner") # List of NFTs currently owned by this account.
   transactions: [Transaction!]! @derivedFrom(field: "account") # List of transactions associated with this account.
 }
 
 # The CovenToken entity represents a minted token.
-type CovenToken @entity {
+type TokenEvent @entity {
   id: ID! # Unique identifier for the token (combination of contract address and tokenId).
   tokenId: BigInt! # The ID of the token.
   contractAddress: Bytes! # The address of the contract where the token was minted.
@@ -45,7 +45,7 @@ type Transaction @entity {
   type: TransactionType! # The type of the transaction, using the TransactionType enum defined earlier.
   buyer: Bytes # The address of the buyer (for sales).
   seller: Bytes # The address of the seller (for sales).
-  nft: NFT! # Reference to the NFT entity involved in this transaction.
+  #nft: NFT! # Reference to the NFT entity involved in this transaction.
   nftSalePrice: BigInt # The amount of the NFT sold (relevant for sales).
   totalSold: BigInt # The total amount of NFTs sold in this transaction (relevant for sales).
   blockNumber: BigInt! # The block number when this transaction was recorded. Helps in tracking historical data.
@@ -57,132 +57,3 @@ type Transaction @entity {
   highestSalePrice: BigInt # Records the highest sale price of an NFT.
   lowestSalePrice: BigInt # Records the lowest sale price of an NFT.
 }
-
-# Temporary entity to hold CryptoCoven tokenId from TransferEvent in the logIndex of the ordersMatched event.
-type TokenEvent @entity {
-  id: ID! # Unique identifier (transaction hash + log index).
-  tokenId: BigInt! # The ID of the token.
-  contractAddress: Bytes! # The address of the contract.
-}
-
-# Definition of the NFT entity
-type NFT @entity {
-  id: ID! # A unique identifier for each NFT.
-  contractAddress: Bytes!
-  currentOwner: Account! # Reference to the Account entity that currently owns this NFT.
-  tokenID: BigInt! # The unique identifier of the NFT.
-  tokenURI: String! # The URI pointing to the metadata of the NFT.
-  ipfsURI: NFTMetadata # Reference to additional metadata for the NFT stored in IPFS.
-  saleCount: BigInt! # The total number of times this NFT has been sold.
-  buyCount: BigInt! # The total number of times this NFT has been bought.
-  mintCount: BigInt! # The total number of times this NFT has been minted.
-  activityCount: BigInt! # The total number of transactions for this NFT bought, sold, mint.
-  transactions: [Transaction!]! @derivedFrom(field: "nft") # List of all transactions involving this NFT.
-  blockTimestamp: BigInt! # The timestamp of the block when this NFT was last updated. Provides a time reference.
-  blockNumber: BigInt! # The block number when this NFT was last updated. Helps in tracking historical changes.
-}
-
-# Definition of the NFTMetadata entity
-type NFTMetadata @entity {
-  id: ID! # A unique identifier for each NFTMetadata entity.
-  description: String! # Description of the NFT.
-  externalURL: String # An external URL related to the NFT, such as a website or profile page.
-  image: String! # URL to the image representing the NFT.
-  name: String! # Name of the NFT.
-  backgroundColor: String # Background color of the NFT.
-  coven: Coven # Reference to the Coven entity for additional metadata.
-  attributes: [Attribute!]! @derivedFrom(field: "nftMetadata") # List of attributes associated with the NFT.
-}
-
-# Definition of the Coven entity
-type Coven @entity {
-  id: ID! # A unique identifier for each Coven entity.
-  name: String! # Name of the coven.
-  type: String! # Type of the coven.
-  description: Description! # Reference to the Description entity for additional description fields.
-  skills: Skills! # Reference to the Skills entity for skill-related fields.
-  birthChart: BirthChart! # Reference to the BirthChart entity for astrological data.
-  styles: [Style!]! @derivedFrom(field: "coven") # List of styles associated with the coven.
-  hash: String! # Hash of the coven metadata.
-}
-
-# Definition of the Description entity
-type Description @entity {
-  id: ID! # A unique identifier for each Description entity.
-  intro: String! # Introductory description of the coven.
-  hobby: String! # Hobby description.
-  magic: String! # Description of the magic related to the coven.
-  typeSpecific: String! # Type-specific description.
-  exclamation: String! # Exclamation related to the coven.
-}
-
-# Definition of the Skills entity
-type Skills @entity {
-  id: ID! # A unique identifier for each Skills entity.
-  will: Int! # Skill level for will.
-  wit: Int! # Skill level for wit.
-  wiles: Int! # Skill level for wiles.
-  wisdom: Int! # Skill level for wisdom.
-  wonder: Int! # Skill level for wonder.
-  woe: Int! # Skill level for woe.
-}
-
-# Definition of the BirthChart entity
-type BirthChart @entity {
-  id: ID! # A unique identifier for each BirthChart entity.
-  sun: String! # Sun sign.
-  moon: String! # Moon sign.
-  rising: String! # Rising sign.
-}
-
-# Definition of the Attribute entity
-type Attribute @entity {
-  id: ID! # A unique identifier for each Attribute entity.
-  traitType: String! # Type of the trait.
-  value: String! # Value of the trait.
-  displayType: String # Display type of the trait (if any).
-  maxValue: BigInt # Maximum value of the trait (if any).
-  nftMetadata: NFTMetadata! # Reference to the NFTMetadata entity that this attribute belongs to.
-}
-
-# Definition of the Style entity
-type Style @entity {
-  id: ID! # A unique identifier for each Style entity.
-  attribute: String! # Attribute name of the style.
-  name: String! # Name of the style.
-  color: String! # Color of the style.
-  coven: Coven! # Reference to the Coven entity that this style belongs to.
-}
-
-# The @fulltext directive creates an index that allows for full-text search capabilities.
-# This feature is useful for performing searches on text fields within your entities.
-# It supports specifying the language and algorithm to use for the search index.
-type _Schema_
-  @fulltext(
-    name: "covenSearch" # The name of the full-text search index.
-    language: en # The language used for the full-text search algorithm.
-    algorithm: rank # The ranking algorithm for the search results.
-    include: [
-      {
-        entity: "NFTMetadata" # The entity to include in the full-text search index.
-        fields: [
-          { name: "name" } # Include the 'name' field from the NFTMetadata entity.
-          { name: "description" } # Include the 'description' field from the NFTMetadata entity.
-        ]
-      }
-      {
-        entity: "Coven" # The entity to include in the full-text search index.
-        fields: [
-          { name: "type" } # Include the 'type' field from the Coven entity.
-        ]
-      }
-      {
-        entity: "BirthChart" # The entity to include in the full-text search index.
-        fields: [
-          { name: "sun" } # Include the 'sun' field from the BirthChart entity.
-          { name: "moon" } # Include the 'moon' field from the BirthChart entity.
-          { name: "rising" } # Include the 'rising' field from the BirthChart entity.
-        ]
-      }
-    ]
-  )

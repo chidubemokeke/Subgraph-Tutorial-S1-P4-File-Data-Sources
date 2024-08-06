@@ -1,18 +1,19 @@
-import { BigInt, Bytes, ethereum } from "@graphprotocol/graph-ts";
-import { Transaction, CovenToken } from "../../generated/schema";
+import { Bytes, log } from "@graphprotocol/graph-ts";
+import { Transaction } from "../../generated/schema";
 import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
 import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
 import {
   getOrCreateAccount,
+  updateAccountStatistics,
   updateAccountTypes,
   updateTransactionStatistics,
 } from "../utils/accountHelper";
-import { BIGINT_ZERO, BIGINT_ONE, ZERO_ADDRESS } from "./constant";
+import { BIGINT_ZERO, ZERO_ADDRESS } from "./constant";
 import {
   getGlobalId,
-  getOrCreateMintEvent,
-  getOrCreateCovenToken,
-  getTokenIdFromMint,
+  getOrCreateToken,
+  getTokenId,
+  getTokenOwner,
 } from "./tokenHelper";
 
 // Enum for Transaction Types
@@ -56,20 +57,21 @@ export function loadOrCreateTransaction(
   return transaction; // Return the loaded or newly created transaction entity
 }
 
-export function handleTransfer(event: TransferEvent): void {
+// Helper function to handle Transfer events
+export function createTransfer(event: TransferEvent): void {
   // Load or create account entities for 'from' and 'to' addresses
   let fromAccount = getOrCreateAccount(event.params.from); // Get or create the account entity for the sender
   let toAccount = getOrCreateAccount(event.params.to); // Get or create the account entity for the recipient
 
-  // Get or create a MintEvent entity based on the Transfer event
-  let mintEvent = getOrCreateMintEvent(event);
+  // Get or create a TokenEvent entity based on the Transfer event
+  let tokenEvent = getOrCreateToken(event);
 
   let tokenId = event.params.tokenId; // Get the tokenId from the event
-  mintEvent.tokenId = tokenId; // Set the tokenId in the MintEvent entity
-  mintEvent.save(); // Save the updated MintEvent entity
+  tokenEvent.tokenId = tokenId; // Set the tokenId in the MintEvent entity
+  tokenEvent.save(); // Save the updated TokenEvent entity
 
-  // Generate a unique transaction ID based on the transaction hash and token ID
-  let transactionId = event.transaction.hash.toHex() + "-" + tokenId; // Create a unique ID
+  // Generate a unique transaction ID
+  let transactionId = getGlobalId(event); // Create a unique ID
 
   // Determine the type of transaction (MINT if 'from' is zero address, otherwise TRADE)
   let transactionType: TransactionType = event.params.from.equals(ZERO_ADDRESS) // Check if the sender address is the zero address
@@ -93,40 +95,66 @@ export function handleTransfer(event: TransferEvent): void {
   transaction.blockTimestamp = event.block.timestamp; // Set the block timestamp
 
   // Update account statistics based on transaction type
-  if (transactionType == TransactionType.MINT) {
-    toAccount.mintCount = (toAccount.mintCount || BIGINT_ZERO).plus(BIGINT_ONE); // Increment the mint count for the recipient account
+  if (event.params.from == ZERO_ADDRESS) {
+    updateAccountStatistics(toAccount, true);
+  } else {
+    updateAccountStatistics(fromAccount, false);
+    updateAccountStatistics(toAccount, false);
   }
 
   // Save the updated account and transaction entities
   updateAccountTypes(fromAccount);
   updateAccountTypes(toAccount); // Save the sender account entity
-  transaction.save(); // Save the transaction entity
+
+  fromAccount.save();
+  toAccount.save();
 }
 
-// Event handler for OrdersMatched events
-export function handleOrdersMatched(event: OrdersMatchedEvent): void {
+// Helper function to handle OrdersMatched events
+export function createOrdersMatched(event: OrdersMatchedEvent): void {
   // Get the token ID from the MintEvent parameters
-  let tokenId = getTokenIdFromMint(event);
+  let tokenId = getTokenId(event);
+
+  if (!tokenId) {
+    log.error("Token ID not found for transaction hash: {} at log index: {}", [
+      event.transaction.hash.toHexString(),
+      event.logIndex.toString(),
+    ]);
+    return;
+  }
+
+  let previousOwner = getTokenOwner(event);
 
   // Determine buyer and seller addresses
-  let buyerAddress = event.params.taker; // Initially set the buyer address to the taker address from the event parameters
-  let sellerAddress = event.params.maker; // Initially set the seller address to the maker address from the event parameters
+  let buyerAddress = event.params.taker; // Address taking the action
+  let sellerAddress = previousOwner; // Previous owner is the seller
 
-  // If maker is not zero address, update buyer and seller addresses
-  if (!sellerAddress.equals(ZERO_ADDRESS)) {
-    buyerAddress = event.params.taker; // If the maker address is not the zero address, update the buyer address
-    sellerAddress = event.params.maker; // If the maker address is not the zero address, update the seller address
+  // If previousOwner is null, log an error and return
+  if (sellerAddress === null) {
+    log.error(
+      "Previous owner not found for transaction hash: {} at log index: {}",
+      [event.transaction.hash.toHexString(), event.logIndex.toString()]
+    );
+    return;
+  }
+
+  // Check if the sellerAddress is the zero address
+  if (sellerAddress.equals(ZERO_ADDRESS)) {
+    log.info("Airdrop detected for transaction hash: {} at log index: {}", [
+      event.transaction.hash.toHexString(),
+      event.logIndex.toString(),
+    ]);
+    sellerAddress = ZERO_ADDRESS; // Assign zero address if it's an airdrop
   }
 
   // Load or create account entities for buyer and seller
-  let buyerAccount = getOrCreateAccount(buyerAddress); // Get or create the account entity for the buyer
-  let sellerAccount = getOrCreateAccount(sellerAddress); // Get or create the account entity for the seller
+  let buyerAccount = getOrCreateAccount(buyerAddress);
+  let sellerAccount = getOrCreateAccount(sellerAddress);
 
-  // Get the sale price from the event parameters
   let salePrice = event.params.price; // Get the sale price from the event parameters
 
-  // Generate a unique transaction ID based on the transaction hash and token ID
-  let transactionId = event.transaction.hash.toHex() + "-" + tokenId; // Create a unique ID by concatenating the transaction hash and token ID
+  // Generate a unique transaction ID
+  let transactionId = getGlobalId(event);
 
   // Create or update transaction entity
   let transaction = loadOrCreateTransaction(
@@ -139,25 +167,21 @@ export function handleOrdersMatched(event: OrdersMatchedEvent): void {
   // Set transaction details from event parameters
   transaction.buyer = buyerAddress; // Set the buyer address
   transaction.seller = sellerAddress; // Set the seller address
-  transaction.tokenId = event.params.tokenId; // Set the token ID
   transaction.nftSalePrice = salePrice; // Set the NFT sale price
   transaction.blockNumber = event.block.number; // Set the block number
   transaction.blockTimestamp = event.block.timestamp; // Set the block timestamp
-  buyerAccount.buyCount = (buyerAccount.buyCount || BIGINT_ZERO).plus(
-    BIGINT_ONE
-  );
-  buyerAccount.totalAmountBought = (
-    buyerAccount.totalAmountBought || BIGINT_ZERO
-  ).plus(salePrice);
 
-  sellerAccount.saleCount = (sellerAccount.saleCount || BIGINT_ZERO).plus(
-    BIGINT_ONE
-  );
-  sellerAccount.totalAmountSold = (
-    sellerAccount.totalAmountSold || BIGINT_ZERO
-  ).plus(salePrice);
+  // Save the transaction entity
+  transaction.save();
 
+  // Update transaction statistics
   updateTransactionStatistics(transaction, salePrice);
+
+  // Update buyer and seller account statistics
+  updateAccountStatistics(buyerAccount, false, true, salePrice); // Update buyer stats for a buy transaction
+  updateAccountStatistics(sellerAccount, false, false, salePrice); // Update seller stats for a sale transaction
+
+  // Update account types if needed
   updateAccountTypes(buyerAccount);
   updateAccountTypes(sellerAccount);
 }

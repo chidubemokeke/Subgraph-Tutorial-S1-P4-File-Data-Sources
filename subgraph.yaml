@@ -19,14 +19,14 @@ dataSources:
         - Account
         - TransferEvent
         - Transaction
-        - NFT
+        - TokenEvent
       abis:
         - name: CryptoCoven
           file: ./abis/CryptoCoven.json
       eventHandlers:
         - event: Transfer(indexed address,indexed address,indexed uint256)
           handler: handleTransfer
-      file: ./src/crypto-coven.ts
+      file: src/mappings/coven.ts
   - kind: ethereum/contract
     name: Opensea
     network: mainnet
@@ -41,25 +41,23 @@ dataSources:
       entities:
         - Account
         - Transaction
-        - TransferEvent
-        - NFT
+        - TokenEvent
       abis:
         - name: Opensea
           file: ./abis/Opensea.json
       eventHandlers:
         - event: OrdersMatched(bytes32,bytes32,indexed address,indexed address,uint256,indexed bytes32)
           handler: handleOpenSeaSale
-      file: ./src/marketplaces/OpenSea.ts
-
-templates:
-  - kind: file/ipfs
-    name: NFTMetadata
-    mapping:
-      apiVersion: 0.0.7
-      language: wasm/assemblyscript
-      file: ./src/crypto-coven.ts
-      entities:
-        - NFTMetadata
-      abis:
-        - name: CryptoCoven
-          file: ./abis/CryptoCoven.json
+      file: src/mappings/coven.ts
+#templates:
+#- kind: file/ipfs
+# name: NFTMetadata
+#mapping:
+# apiVersion: 0.0.7
+#language: wasm/assemblyscript
+#file: ./src/crypto-coven.ts
+#entities:
+# - NFTMetadata
+# abis:
+#- name: CryptoCoven
+#  file: ./abis/CryptoCoven.json
