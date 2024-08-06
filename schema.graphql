@@ -10,6 +10,8 @@ enum TransactionType {
 # Definition of the Account entity
 type Account @entity {
   id: ID! # A unique identifier for each account.
+  sent: [CovenToken!]! @derivedFrom(field: "from") # Array of transfers sent by the account
+  received: [CovenToken!]! @derivedFrom(field: "to") # Array of transfers received by the account
   buyCount: BigInt # The total number of NFTs purchased by this account.
   saleCount: BigInt # The total number of NFTs sold by this account.
   mintCount: BigInt # The total number of NFTs minted by this account.
@@ -27,22 +29,39 @@ type Account @entity {
   transactions: [Transaction!]! @derivedFrom(field: "account") # List of transactions associated with this account.
 }
 
-# The CovenToken entity represents a minted token.
-type TokenEvent @entity {
+# Temporary CovenTransfer entity represents a Mint/Transfer event and the tokenID.
+
+type CovenIDTracker @entity {
   id: ID! # Unique identifier for the token (combination of contract address and tokenId).
   tokenId: BigInt! # The ID of the token.
   contractAddress: Bytes! # The address of the contract where the token was minted.
-  owner: Bytes! # The current owner of the token.
+  type: TransactionType! # The type of the transaction, using the TransactionType enum defined earlier.
+  logNumber: BigInt! # Transaction details
+  blockNumber: BigInt!
+  blockHash: Bytes!
+  txHash: Bytes!
+  timestamp: BigInt!
+}
+
+type CovenToken @entity {
+  id: ID! # TxHash + logNumber #This ID/Entity is used for referencing events in the same transaction
+  from: Account! # The address of the sender
+  to: Account! # The address of the receiver
+  owner: String! # New owner of Coven NFT
+  amount: BigInt # Amount of NFTS transferred
+  referenceId: String! # Field for storing referenceIDs of other events in the same transaction.
+  "Transaction details"
+  blockNumber: BigInt!
+  blockHash: Bytes!
+  txHash: Bytes!
+  timestamp: BigInt!
 }
 
 # Definition of the Transaction entity
 type Transaction @entity {
   id: ID! # A unique identifier for each transaction.
   account: Account! # Reference to the Account entity involved in this transaction.
-  from: Bytes! # The address of the sender if the transaction involves a mint.
-  to: Bytes! # The address of the receiver of a mint
   tokenId: BigInt! # The unique identifier of the NFT being transferred.
-  type: TransactionType! # The type of the transaction, using the TransactionType enum defined earlier.
   buyer: Bytes # The address of the buyer (for sales).
   seller: Bytes # The address of the seller (for sales).
   #nft: NFT! # Reference to the NFT entity involved in this transaction.

@@ -17,7 +17,7 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - Account
-        - TransferEvent
+        - CovenIDTracker
         - Transaction
         - TokenEvent
       abis:
@@ -41,7 +41,7 @@ dataSources:
       entities:
         - Account
         - Transaction
-        - TokenEvent
+        - CovenIDTracker
       abis:
         - name: Opensea
           file: ./abis/Opensea.json

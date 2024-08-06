@@ -51,3 +51,15 @@ export function getTokenOwner(event: ethereum.Event): Bytes | null {
   let tokenEvent = TokenEvent.load(id);
   return tokenEvent ? tokenEvent.contractAddress : null;
 }
+
+// Helper function to get a specific TransferEvent
+export function getTransferEventById(event: ethereum.Event): MintEvent | null {
+  // Generate a unique ID for the event
+  let id = getGlobalId(event);
+  
+  // Load the TransferEvent from the store using the generated ID
+  let transferEvent = MintEvent.load(id);
+  
+  // Return the TransferEvent if found, otherwise null
+  return transferEvent ? transferEvent as MintEvent : null;
+}
