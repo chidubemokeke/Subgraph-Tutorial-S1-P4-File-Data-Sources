@@ -15,9 +15,11 @@ export function getOrCreateAccount(accountAddress: Bytes): Account {
   if (!account) {
     // Create a new account entity if it does not exist
     account = new Account(accountAddress.toHex());
-    account.buyCount = BIGINT_ZERO; // Initialize buy count
-    account.saleCount = BIGINT_ZERO; // Initialize sale count
+    account.transactionCount = BIGINT_ZERO;
     account.mintCount = BIGINT_ZERO; // Initialize mint count
+    account.buyCount = BIGINT_ZERO; // Initialize mint count
+    account.saleCount = BIGINT_ZERO; // Initialize mint count
+    account.isOG = false; // Default to not being a collector
     account.isCollector = false; // Default to not being a collector
     account.isHunter = false; // Default to not being a hunter
     account.isFarmer = false; // Default to not being a farmer
@@ -29,9 +31,6 @@ export function getOrCreateAccount(accountAddress: Bytes): Account {
     account.blockTimestamp = BIGINT_ZERO; // Initialize block timestamp
   } else {
     // Ensure existing account fields are initialized
-    account.buyCount = account.buyCount || BIGINT_ZERO; // Use existing value or initialize
-    account.saleCount = account.saleCount || BIGINT_ZERO;
-    account.mintCount = account.mintCount || BIGINT_ZERO;
     account.totalAmountBought = account.totalAmountBought || BIGINT_ZERO;
     account.totalAmountSold = account.totalAmountSold || BIGINT_ZERO;
     account.totalAmountBalance || BIGINT_ZERO;
@@ -45,35 +44,19 @@ export function getOrCreateAccount(accountAddress: Bytes): Account {
 // Helper function to update account statistics
 export function updateAccountStatistics(
   account: Account,
-  isMint: boolean,
-  isBuy: boolean = false, // Added parameter to track buy transactions
-  salePrice: BigInt | null = null // Optional sale price for sales or buys
+  isMint: boolean
 ): void {
-  // If the transaction is a minting event
-  if (isMint) {
-    // Increment the mint count for the account
-    account.mintCount = (account.mintCount || BIGINT_ZERO).plus(BIGINT_ONE);
+  // Initialize mint field if null
+  if (!account.mintCount) {
+    account.mintCount = BIGINT_ZERO;
   }
-  // If the transaction is a buy event
-  else if (isBuy) {
-    // Increment the buy count for the account
-    account.buyCount = (account.buyCount || BIGINT_ZERO).plus(BIGINT_ONE);
-    // Add the sale price to the total amount bought, if provided
-    if (salePrice) {
-      account.totalAmountBought = (
-        account.totalAmountBought || BIGINT_ZERO
-      ).plus(salePrice);
-    }
+  // Increment mintCount if it's a mint event
+  if (!isMint) {
+    account.mintCount = account.mintCount.plus(BIGINT_ONE);
   }
-  // If the transaction is a sale event and a sale price is provided
-  else if (salePrice) {
-    // Increment the sale count for the account
-    account.saleCount = (account.saleCount || BIGINT_ZERO).plus(BIGINT_ONE);
-    // Add the sale price to the total amount sold
-    account.totalAmountSold = (account.totalAmountSold || BIGINT_ZERO).plus(
-      salePrice
-    );
-  }
+
+  // Increment the transaction count for both mint and trade events
+  account.transactionCount = account.transactionCount.plus(BIGINT_ONE);
 
   // Save the updated account entity
   account.save();

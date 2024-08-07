@@ -62,6 +62,36 @@ export class Account extends Entity {
     );
   }
 
+  get transactionCount(): BigInt {
+    let value = this.get("transactionCount");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set transactionCount(value: BigInt) {
+    this.set("transactionCount", Value.fromBigInt(value));
+  }
+
+  get mintCount(): BigInt | null {
+    let value = this.get("mintCount");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set mintCount(value: BigInt | null) {
+    if (!value) {
+      this.unset("mintCount");
+    } else {
+      this.set("mintCount", Value.fromBigInt(<BigInt>value));
+    }
+  }
+
   get buyCount(): BigInt | null {
     let value = this.get("buyCount");
     if (!value || value.kind == ValueKind.NULL) {
@@ -93,23 +123,6 @@ export class Account extends Entity {
       this.unset("saleCount");
     } else {
       this.set("saleCount", Value.fromBigInt(<BigInt>value));
-    }
-  }
-
-  get mintCount(): BigInt | null {
-    let value = this.get("mintCount");
-    if (!value || value.kind == ValueKind.NULL) {
-      return null;
-    } else {
-      return value.toBigInt();
-    }
-  }
-
-  set mintCount(value: BigInt | null) {
-    if (!value) {
-      this.unset("mintCount");
-    } else {
-      this.set("mintCount", Value.fromBigInt(<BigInt>value));
     }
   }
 
@@ -264,7 +277,7 @@ export class Account extends Entity {
   }
 }
 
-export class CovenIDTracker extends Entity {
+export class CovenTracker extends Entity {
   constructor(id: string) {
     super();
     this.set("id", Value.fromString(id));
@@ -272,24 +285,24 @@ export class CovenIDTracker extends Entity {
 
   save(): void {
     let id = this.get("id");
-    assert(id != null, "Cannot save CovenIDTracker entity without an ID");
+    assert(id != null, "Cannot save CovenTracker entity without an ID");
     if (id) {
       assert(
         id.kind == ValueKind.STRING,
-        `Entities of type CovenIDTracker must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
+        `Entities of type CovenTracker must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
       );
-      store.set("CovenIDTracker", id.toString(), this);
+      store.set("CovenTracker", id.toString(), this);
     }
   }
 
-  static loadInBlock(id: string): CovenIDTracker | null {
-    return changetype<CovenIDTracker | null>(
-      store.get_in_block("CovenIDTracker", id),
+  static loadInBlock(id: string): CovenTracker | null {
+    return changetype<CovenTracker | null>(
+      store.get_in_block("CovenTracker", id),
     );
   }
 
-  static load(id: string): CovenIDTracker | null {
-    return changetype<CovenIDTracker | null>(store.get("CovenIDTracker", id));
+  static load(id: string): CovenTracker | null {
+    return changetype<CovenTracker | null>(store.get("CovenTracker", id));
   }
 
   get id(): string {

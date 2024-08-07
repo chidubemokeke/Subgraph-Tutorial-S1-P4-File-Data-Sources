@@ -11,7 +11,7 @@ import {
 import { BIGINT_ZERO, ZERO_ADDRESS } from "./constant";
 import {
   getGlobalId,
-  getOrCreateToken,
+  getOrCovenTracker,
   getTokenId,
   getTokenOwner,
 } from "./tokenHelper";
@@ -36,9 +36,6 @@ export function loadOrCreateTransaction(
     // Create a new transaction entity if it does not exist
     transaction = new Transaction(id);
     transaction.account = accountId; // Set the account ID
-    transaction.type = type; // Set the transaction type (MINT or TRADE)
-    transaction.from = Bytes.empty(); // Initialize 'from' address
-    transaction.to = Bytes.empty(); // Initialize 'to' address
     transaction.buyer = Bytes.empty(); // Initialize buyer address
     transaction.seller = Bytes.empty(); // Initialize seller address
     transaction.tokenId = BIGINT_ZERO; // Initialize NFT information
@@ -64,7 +61,7 @@ export function createTransfer(event: TransferEvent): void {
   let toAccount = getOrCreateAccount(event.params.to); // Get or create the account entity for the recipient
 
   // Get or create a TokenEvent entity based on the Transfer event
-  let tokenEvent = getOrCreateToken(event);
+  let tokenEvent = getOrCovenTracker(event);
 
   let tokenId = event.params.tokenId; // Get the tokenId from the event
   tokenEvent.tokenId = tokenId; // Set the tokenId in the MintEvent entity
