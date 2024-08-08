@@ -12,42 +12,43 @@ type Account @entity {
   id: ID! # A unique identifier for each account.
   sent: [CovenToken!]! @derivedFrom(field: "from") # Array of CovenTokens sent by the account
   received: [CovenToken!]! @derivedFrom(field: "to") # Array of CovenTokens received by the account
-  transactionCount: BigInt!
-  mintCount: BigInt
-  buyCount: BigInt
-  saleCount: BigInt
+  activityCount: BigInt! # Transaction count for account, Mint/Sale.
+  mintCount: BigInt!
+  buyCount: BigInt!
+  saleCount: BigInt!
   isOG: Boolean # True if the account only mints and holds
   isCollector: Boolean # True if the account only mints/buys and holds
-  isHunter: Boolean # True if the account mints and sells but doesn't buy/sell more
+  isHunter: Boolean # True if the account mints and sells but doesn't buy
   isFarmer: Boolean # True if the account mints, sells, and engages in other transactions
   isTrader: Boolean # True if the account only trades on OpenSea
-  totalAmountBought: BigInt # The total value of NFTs bought
-  totalAmountSold: BigInt # The total value of NFTs sold
-  totalAmountBalance: BigInt # The total balance of the account in terms of cryptocurrency.
+  totalAmountBought: BigInt! # The total value of NFTs bought
+  totalAmountSold: BigInt! # The total value of NFTs sold
+  totalAmountBalance: BigInt! # The total balance of the account in terms of cryptocurrency.
   blockNumber: BigInt! # The block number when this entity was last updated. Helps in tracking historical changes.
   blockTimestamp: BigInt! # The timestamp of the block when this entity was last updated. Provides a time reference.
-  transactions: [Transaction!]! @derivedFrom(field: "account") # List of transactions associated with this account.
+  transactions: [Transaction!]! @derivedFrom(field: "account") # List of Token transactions associated with this account.
+  history: [AccountHistory!]! @derivedFrom(field: "account") # One-to-Many relationship: An account can have multiple historical records (Mints/Buys/Sales)
 }
 
-# Temporary CovenTransfer entity represents a Mint/Transfer event and the tokenID.
-
-type CovenTracker @entity {
-  id: ID! # Unique identifier for the token (combination of contract address and tokenId).
-  tokenId: BigInt! # The ID of the token.
-  contractAddress: Bytes! # The address of the contract where the token was minted.
-  type: TransactionType! # The type of the transaction, using the TransactionType enum defined earlier.
-  logNumber: BigInt! # Transaction details
-  blockNumber: BigInt!
+# AccountHistory Entity to track history and update account types. (OG, Collector, Hunter, Farmer, Trader)
+type AccountHistory @entity {
+  id: ID!
+  account: Account!
+  timestamp: BigInt!
+  mintCount: BigInt! # Mint count at the time of the history record
+  buyCount: BigInt! # Buy count at the time of the history record
+  saleCount: BigInt! # Sale count at the time of the history record
   blockHash: Bytes!
   txHash: Bytes!
-  timestamp: BigInt!
 }
 
+# Represents Coven token Transfer/Mint Events
 type CovenToken @entity {
   id: ID! # TxHash + logNumber #This ID/Entity is used for referencing events in the same transaction
   from: Account! # The address of the sender
   to: Account! # The address of the receiver
   owner: String! # New owner of Coven NFT
+  tokenId: BigInt! # The ID of the token.
   amount: BigInt # Amount of NFTS transferred
   referenceId: String! # Field for storing referenceIDs of other events in the same transaction.
   "Transaction details"
@@ -60,18 +61,20 @@ type CovenToken @entity {
 # Definition of the Transaction entity
 type Transaction @entity {
   id: ID! # A unique identifier for each transaction.
-  account: Account! # Reference to the Account entity involved in this transaction.
-  tokenId: BigInt! # The unique identifier of the NFT being transferred.
+  account: Account!
+  nft: CovenToken! # NFT being transferred. Many-to-One relationship: Each transaction involves one NFT (token)
+  transactionType: TransactionType!
   buyer: Bytes # The address of the buyer (for sales).
   seller: Bytes # The address of the seller (for sales).
-  nftSalePrice: BigInt # The amount of the NFT sold (relevant for sales).
-  totalSold: BigInt # The total amount of NFTs sold in this transaction (relevant for sales).
+  nftSalePrice: BigInt # The amount of the NFT Tokens sold (relevant for sales).
+  totalNFTsSold: BigInt! # The total number of NFTs sold in this transaction (relevant for sales).
   blockNumber: BigInt! # The block number when this transaction was recorded. Helps in tracking historical data.
   blockTimestamp: BigInt! # The timestamp of the block when this transaction was recorded. Provides a time reference.
   # More aggregatedata fields
-  totalSalesVolume: BigInt # Aggregates the total amount sold across all transactions
-  averageSalePrice: BigInt # Calculates the average price of NFTs sold.
-  totalSalesCount: BigInt # Tracks the total number of NFT sales.
-  highestSalePrice: BigInt # Records the highest sale price of an NFT.
-  lowestSalePrice: BigInt # Records the lowest sale price of an NFT.
+  transactionCount: BigInt! # Total number of transactions on OpenSea
+  totalSalesVolume: BigInt! # Aggregates the total amount sold across all transactions
+  averageSalePrice: BigInt! # Calculates the average price of NFTs sold.
+  totalSalesCount: BigInt! # Tracks the total number of NFT sales.
+  highestSalePrice: BigInt! # Records the highest sale price of an NFT.
+  lowestSalePrice: BigInt! # Records the lowest sale price of an NFT.
 }

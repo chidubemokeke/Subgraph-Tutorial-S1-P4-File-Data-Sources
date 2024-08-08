@@ -17,9 +17,9 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - Account
-        - CovenIDTracker
+        - AccountHistory
+        - CovenToken
         - Transaction
-        - TokenEvent
       abis:
         - name: CryptoCoven
           file: ./abis/CryptoCoven.json
@@ -40,8 +40,9 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - Account
+        - AccountHistory
+        - CovenToken
         - Transaction
-        - CovenIDTracker
       abis:
         - name: Opensea
           file: ./abis/Opensea.json

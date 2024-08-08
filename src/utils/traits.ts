@@ -1,4 +1,4 @@
-import { Bytes, BigInt } from "@graphprotocol/graph-ts";
+/**import { Bytes, BigInt } from "@graphprotocol/graph-ts";
 import {
   NFT,
   NFTMetadata,
@@ -114,4 +114,4 @@ export function initializeStyle(id: string): Style {
   style.coven = ""; // Reference to Coven entity
   style.save(); // Save the entity to the store
   return style;
-}
+}**/

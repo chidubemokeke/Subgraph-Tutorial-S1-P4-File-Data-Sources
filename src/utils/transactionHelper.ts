@@ -1,5 +1,5 @@
 import { Bytes, log } from "@graphprotocol/graph-ts";
-import { Transaction } from "../../generated/schema";
+import { CovenToken, CovenTracker, Transaction } from "../../generated/schema";
 import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
 import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
 import {
@@ -9,12 +9,7 @@ import {
   updateTransactionStatistics,
 } from "../utils/accountHelper";
 import { BIGINT_ZERO, ZERO_ADDRESS } from "./constant";
-import {
-  getGlobalId,
-  getOrCovenTracker,
-  getTokenId,
-  getTokenOwner,
-} from "./tokenHelper";
+import { getGlobalId, getOrCreateCovenToken, getTokenId } from "./helpers";
 
 // Enum for Transaction Types
 export enum TransactionType {
@@ -26,8 +21,7 @@ export enum TransactionType {
 // Helper function to load or create a Transaction entity
 export function loadOrCreateTransaction(
   id: string,
-  accountId: string,
-  type: TransactionType
+  accountId: string
 ): Transaction {
   // Attempt to load the transaction entity by its ID
   let transaction = Transaction.load(id);
@@ -39,6 +33,7 @@ export function loadOrCreateTransaction(
     transaction.buyer = Bytes.empty(); // Initialize buyer address
     transaction.seller = Bytes.empty(); // Initialize seller address
     transaction.tokenId = BIGINT_ZERO; // Initialize NFT information
+    transaction.type = TransType;
     transaction.nftSalePrice = BIGINT_ZERO; // Initialize sale price
     transaction.totalSold = BIGINT_ZERO; // Initialize total sold amount
     transaction.blockNumber = BIGINT_ZERO; // Initialize block number
@@ -61,11 +56,11 @@ export function createTransfer(event: TransferEvent): void {
   let toAccount = getOrCreateAccount(event.params.to); // Get or create the account entity for the recipient
 
   // Get or create a TokenEvent entity based on the Transfer event
-  let tokenEvent = getOrCovenTracker(event);
+  let covenToken = getOrCreateCovenToken(event);
 
   let tokenId = event.params.tokenId; // Get the tokenId from the event
-  tokenEvent.tokenId = tokenId; // Set the tokenId in the MintEvent entity
-  tokenEvent.save(); // Save the updated TokenEvent entity
+  covenToken.tokenId = tokenId; // Set the tokenId in the Transfer entity
+  covenToken.save(); // Save the updated TokenEvent entity
 
   // Generate a unique transaction ID
   let transactionId = getGlobalId(event); // Create a unique ID
@@ -76,32 +71,30 @@ export function createTransfer(event: TransferEvent): void {
     : TransactionType.TRADE; // If false, the transaction type is TRADE
 
   // Create or update transaction entity
-  let transaction = loadOrCreateTransaction(
-    // Load or create the transaction entity
-    transactionId, // Use the generated transaction ID
-    toAccount.id, // Set the account ID of the recipient
-    transactionType // Set the determined transaction type
-  );
+  let transaction = loadOrCreateTransaction(transactionId, toAccount.id);
+  covenToken.from = event.params.from;
+  transaction.to = event.params.to;
+  transaction.tokenId = event.params.tokenId;
+  transaction.nft = transaction.id;
+  transaction.blockNumber = event.block.number;
+  transaction.blockTimestamp = event.block.timestamp;
+  transaction.save();
 
-  // Set transaction details from event parameters
-  transaction.from = event.params.from; // Set the 'from' address
-  transaction.to = event.params.to; // Set the 'to' address
-  transaction.tokenId = event.params.tokenId; // Set the token ID
-  transaction.nft = transaction.id; //
-  transaction.blockNumber = event.block.number; // Set the block number
-  transaction.blockTimestamp = event.block.timestamp; // Set the block timestamp
-
-  // Update account statistics based on transaction type
-  if (event.params.from == ZERO_ADDRESS) {
+  // Update account statistics
+  if (event.params.from.equals(ZERO_ADDRESS)) {
     updateAccountStatistics(toAccount, true);
   } else {
-    updateAccountStatistics(fromAccount, false);
-    updateAccountStatistics(toAccount, false);
+    updateAccountStatistics(fromAccount, false, false);
+    updateAccountStatistics(toAccount, false, true);
   }
 
-  // Save the updated account and transaction entities
+  // Update account history
+  updateAccountHistory(fromAccount, event);
+  updateAccountHistory(toAccount, event);
+
+  // Update account types
   updateAccountTypes(fromAccount);
-  updateAccountTypes(toAccount); // Save the sender account entity
+  updateAccountTypes(toAccount);
 
   fromAccount.save();
   toAccount.save();
