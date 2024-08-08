@@ -1,6 +1,8 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts";
-import { Account, Transaction } from "../../generated/schema";
+import { Account, AccountHistory, Transaction } from "../../generated/schema";
+import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
 import { BIGINT_ONE, BIGINT_ZERO } from "./constant";
+import { getGlobalId } from "./helpers";
 
 // Enum for Transaction Types
 export enum TransactionType {
@@ -15,22 +17,26 @@ export function getOrCreateAccount(accountAddress: Bytes): Account {
   if (!account) {
     // Create a new account entity if it does not exist
     account = new Account(accountAddress.toHex());
-    account.transactionCount = BIGINT_ZERO;
+    account.activityCount = BIGINT_ZERO;
     account.mintCount = BIGINT_ZERO; // Initialize mint count
     account.buyCount = BIGINT_ZERO; // Initialize mint count
     account.saleCount = BIGINT_ZERO; // Initialize mint count
-    account.isOG = false; // Default to not being a collector
-    account.isCollector = false; // Default to not being a collector
-    account.isHunter = false; // Default to not being a hunter
-    account.isFarmer = false; // Default to not being a farmer
-    account.isTrader = false; // Default to not being a trader
     account.totalAmountBought = BIGINT_ZERO; // Initialize total amount bought
     account.totalAmountSold = BIGINT_ZERO; // Initialize total amount sold
     account.totalAmountBalance = BIGINT_ZERO; // Initialize total balance
     account.blockNumber = BIGINT_ZERO; // Initialize block number
     account.blockTimestamp = BIGINT_ZERO; // Initialize block timestamp
+    account.isOG = false; // Default to not being a collector
+    account.isCollector = false; // Default to not being a collector
+    account.isHunter = false; // Default to not being a hunter
+    account.isFarmer = false; // Default to not being a farmer
+    account.isTrader = false; // Default to not being a trader
   } else {
     // Ensure existing account fields are initialized
+    /** */ account.activityCount = account.activityCount || BIGINT_ZERO;
+    account.mintCount = account.mintCount || BIGINT_ZERO;
+    account.buyCount = account.buyCount || BIGINT_ZERO;
+    account.saleCount = account.saleCount || BIGINT_ZERO;
     account.totalAmountBought = account.totalAmountBought || BIGINT_ZERO;
     account.totalAmountSold = account.totalAmountSold || BIGINT_ZERO;
     account.totalAmountBalance || BIGINT_ZERO;
@@ -41,66 +47,114 @@ export function getOrCreateAccount(accountAddress: Bytes): Account {
   return account; // Return the loaded or newly created account entity
 }
 
+// Function to update account history with the new global ID function
+export function updateAccountHistory(
+  account: Account,
+  event: TransferEvent
+): void {
+  let history = new AccountHistory(getGlobalId(event, account.id)); // Create a new account history entity with account-specific global ID
+  history.account = account.id; // Set the account ID
+  history.timestamp = event.block.timestamp; // Set the timestamp
+  history.mintCount = account.mintCount; // Set the mint count
+  history.buyCount = account.buyCount; // Set the buy count
+  history.saleCount = account.saleCount; // Set the sale count
+  history.blockHash = event.block.hash; // Set the block hash
+  history.txHash = event.transaction.hash; // Set the transaction hash
+  history.save(); // Save the new account history entity to the store
+}
+
 // Helper function to update account statistics
 export function updateAccountStatistics(
   account: Account,
-  isMint: boolean
+  isMint: boolean,
+  isBuy: boolean = false,
+  isSale: boolean = false
 ): void {
-  // Initialize mint field if null
-  if (!account.mintCount) {
-    account.mintCount = BIGINT_ZERO;
+  if (isMint) {
+    account.mintCount = account.mintCount.plus(BIGINT_ONE); // Increment mintCount if it's a mint transaction
+  } else if (isBuy) {
+    account.buyCount = account.buyCount.plus(BIGINT_ONE); // Increment buyCount if it's a purchase transaction
+  } else if (isSale) {
+    account.saleCount = account.saleCount.plus(BIGINT_ONE); // Increment saleCount if it's a sale transaction
   }
-  // Increment mintCount if it's a mint event
-  if (!isMint) {
-    account.mintCount = account.mintCount.plus(BIGINT_ONE);
+  account.activityCount = account.activityCount.plus(BIGINT_ONE); // Increment account activity count
+}
+
+// Function to analyze historical data
+export function analyzeHistoricalData(accountId: string): void {
+  let historyRecords = AccountHistory.load(accountId); // Load account history records
+
+  // Persist and Initialize historical data counts for consistency and accurate data
+  let mintCount = BIGINT_ZERO;
+  let buyCount = BIGINT_ZERO;
+  let saleCount = BIGINT_ZERO;
+
+  // Aggregate historical data
+  for (let i = 0; i < historyRecords.length; i++) {
+    mintCount = mintCount.plus(historyRecords[i].mintCount); // Aggregate mint count
+    buyCount = buyCount.plus(historyRecords[i].buyCount); // Aggregate buy count
+    saleCount = saleCount.plus(historyRecords[i].saleCount); // Aggregate sale count
   }
 
-  // Increment the transaction count for both mint and trade events
-  account.transactionCount = account.transactionCount.plus(BIGINT_ONE);
+  // Analyze historical data to determine account types
+  let isOG =
+    mintCount.gt(BIGINT_ZERO) &&
+    buyCount.equals(BIGINT_ZERO) &&
+    saleCount.equals(BIGINT_ZERO);
+  let isCollector =
+    (mintCount.gt(BIGINT_ZERO) || buyCount.gt(BIGINT_ZERO)) &&
+    saleCount.equals(BIGINT_ZERO);
+  let isHunter =
+    mintCount.gt(BIGINT_ZERO) &&
+    buyCount.equals(BIGINT_ZERO) &&
+    saleCount.gt(BIGINT_ZERO);
+  let isFarmer =
+    mintCount.gt(BIGINT_ZERO) &&
+    buyCount.gt(BIGINT_ZERO) &&
+    saleCount.gt(BIGINT_ZERO);
+  let isTrader =
+    mintCount.equals(BIGINT_ZERO) &&
+    (buyCount.gt(BIGINT_ZERO) || saleCount.gt(BIGINT_ZERO));
 
-  // Save the updated account entity
-  account.save();
+  // Update account with historical analysis
+  let account = Account.load(accountId);
+  if (account != null) {
+    account.isOG = isOG; // Update isOG status
+    account.isCollector = isCollector; // Update isCollector status
+    account.isHunter = isHunter; // Update isHunter status
+    account.isFarmer = isFarmer; // Update isFarmer status
+    account.isTrader = isTrader; // Update isTrader status
+    account.save(); // Save the updated account entity to the store
+  }
 }
 
 // Function to update account types based on their activities
 export function updateAccountTypes(account: Account): void {
-  // Check if mintCount is null, and if so, default to BIGINT_ZERO
-  const mintCount = account.mintCount || BIGINT_ZERO;
-  const buyCount = account.buyCount || BIGINT_ZERO;
-  const saleCount = account.saleCount || BIGINT_ZERO;
+  const mintCount = account.mintCount || BIGINT_ZERO; // Get mint count or default to zero
+  const buyCount = account.buyCount || BIGINT_ZERO; // Get buy count or default to zero
+  const saleCount = account.saleCount || BIGINT_ZERO; // Get sale count or default to zero
 
-  // Check if the account is an OG
-  // An OG account only mints and holds NFTs
+  // Update account types based on activities
   account.isOG =
-    mintCount.gt(BIGINT_ZERO) && // Must have minted at least one NFT
-    buyCount.equals(BIGINT_ZERO) && // Must not have bought any NFTs
-    saleCount.equals(BIGINT_ZERO); // Must not have sold any NFTs
-
-  // Check if the account is a Collector
-  // A Collector mints or buys NFTs but does not sell
+    mintCount.gt(BIGINT_ZERO) &&
+    buyCount.equals(BIGINT_ZERO) &&
+    saleCount.equals(BIGINT_ZERO);
   account.isCollector =
-    (mintCount.gt(BIGINT_ZERO) || buyCount.gt(BIGINT_ZERO)) && // Must have minted or bought at least one NFT
-    saleCount.equals(BIGINT_ZERO); // Must not have sold any NFTs
-
-  // Check if the account is a Hunter
-  // A Hunter mints, sells, but does not buy
+    (mintCount.gt(BIGINT_ZERO) || buyCount.gt(BIGINT_ZERO)) &&
+    saleCount.equals(BIGINT_ZERO);
   account.isHunter =
-    mintCount.gt(BIGINT_ZERO) && // Must have minted at least one NFT
-    buyCount.equals(BIGINT_ZERO) && // Must not have bought any NFTs
-    saleCount.gt(BIGINT_ZERO); // Must have sold at least one NFT
-
-  // Check if the account is a Farmer
-  // A Farmer mints, buys, sells, and engages in other transactions
+    mintCount.gt(BIGINT_ZERO) &&
+    buyCount.equals(BIGINT_ZERO) &&
+    saleCount.gt(BIGINT_ZERO);
   account.isFarmer =
-    mintCount.gt(BIGINT_ZERO) && // Must have minted at least one NFT
-    buyCount.gt(BIGINT_ZERO) && // Must have bought at least one NFT
-    saleCount.gt(BIGINT_ZERO); // Must have sold at least one NFT
-
-  // Check if the account is a Trader
-  // A Trader does not mint but buys or sells NFTs
+    mintCount.gt(BIGINT_ZERO) &&
+    buyCount.gt(BIGINT_ZERO) &&
+    saleCount.gt(BIGINT_ZERO);
   account.isTrader =
-    mintCount.equals(BIGINT_ZERO) && // Must not have minted any NFTs
-    (buyCount.gt(BIGINT_ZERO) || saleCount.gt(BIGINT_ZERO)); // Must have bought or sold at least one NFT
+    mintCount.equals(BIGINT_ZERO) &&
+    (buyCount.gt(BIGINT_ZERO) || saleCount.gt(BIGINT_ZERO));
+
+  account.save(); // Save the updated account entity to the store
 }
 
 // Helper function to update transaction statistics
