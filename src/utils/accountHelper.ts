@@ -1,6 +1,5 @@
-import { BigInt, Bytes } from "@graphprotocol/graph-ts";
+import { BigInt, Bytes, ethereum } from "@graphprotocol/graph-ts";
 import { Account, AccountHistory, Transaction } from "../../generated/schema";
-import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
 import { BIGINT_ONE, BIGINT_ZERO } from "./constant";
 import { getGlobalId } from "./helpers";
 
@@ -10,13 +9,13 @@ export enum TransactionType {
   MINT = "MINT",
 }
 
-export function getOrCreateAccount(accountAddress: Bytes): Account {
+export function getOrCreateAccount(accountId: string): Account {
   // Attempt to load the account entity by its address
-  let account = Account.load(accountAddress.toHex());
+  let account = Account.load(accountId);
 
   if (!account) {
     // Create a new account entity if it does not exist
-    account = new Account(accountAddress.toHex());
+    account = new Account(accountId);
     account.activityCount = BIGINT_ZERO;
     account.mintCount = BIGINT_ZERO; // Initialize mint count
     account.buyCount = BIGINT_ZERO; // Initialize mint count
@@ -33,7 +32,7 @@ export function getOrCreateAccount(accountAddress: Bytes): Account {
     account.isTrader = false; // Default to not being a trader
   } else {
     // Ensure existing account fields are initialized
-    /** */ account.activityCount = account.activityCount || BIGINT_ZERO;
+    account.activityCount = account.activityCount || BIGINT_ZERO;
     account.mintCount = account.mintCount || BIGINT_ZERO;
     account.buyCount = account.buyCount || BIGINT_ZERO;
     account.saleCount = account.saleCount || BIGINT_ZERO;
@@ -47,114 +46,85 @@ export function getOrCreateAccount(accountAddress: Bytes): Account {
   return account; // Return the loaded or newly created account entity
 }
 
-// Function to update account history with the new global ID function
-export function updateAccountHistory(
-  account: Account,
-  event: TransferEvent
-): void {
-  let history = new AccountHistory(getGlobalId(event, account.id)); // Create a new account history entity with account-specific global ID
-  history.account = account.id; // Set the account ID
-  history.timestamp = event.block.timestamp; // Set the timestamp
-  history.mintCount = account.mintCount; // Set the mint count
-  history.buyCount = account.buyCount; // Set the buy count
-  history.saleCount = account.saleCount; // Set the sale count
-  history.blockHash = event.block.hash; // Set the block hash
-  history.txHash = event.transaction.hash; // Set the transaction hash
-  history.save(); // Save the new account history entity to the store
-}
-
-// Helper function to update account statistics
-export function updateAccountStatistics(
-  account: Account,
-  isMint: boolean,
-  isBuy: boolean = false,
-  isSale: boolean = false
-): void {
-  if (isMint) {
-    account.mintCount = account.mintCount.plus(BIGINT_ONE); // Increment mintCount if it's a mint transaction
-  } else if (isBuy) {
-    account.buyCount = account.buyCount.plus(BIGINT_ONE); // Increment buyCount if it's a purchase transaction
-  } else if (isSale) {
-    account.saleCount = account.saleCount.plus(BIGINT_ONE); // Increment saleCount if it's a sale transaction
-  }
-  account.activityCount = account.activityCount.plus(BIGINT_ONE); // Increment account activity count
-}
-
-// Function to analyze historical data
+/**
+ * Analyzes historical data to determine the account types.
+ * @param accountId The ID of the account to analyze.
+ */
 export function analyzeHistoricalData(accountId: string): void {
-  let historyRecords = AccountHistory.load(accountId); // Load account history records
-
-  // Persist and Initialize historical data counts for consistency and accurate data
-  let mintCount = BIGINT_ZERO;
-  let buyCount = BIGINT_ZERO;
-  let saleCount = BIGINT_ZERO;
-
-  // Aggregate historical data
-  for (let i = 0; i < historyRecords.length; i++) {
-    mintCount = mintCount.plus(historyRecords[i].mintCount); // Aggregate mint count
-    buyCount = buyCount.plus(historyRecords[i].buyCount); // Aggregate buy count
-    saleCount = saleCount.plus(historyRecords[i].saleCount); // Aggregate sale count
-  }
-
-  // Analyze historical data to determine account types
-  let isOG =
-    mintCount.gt(BIGINT_ZERO) &&
-    buyCount.equals(BIGINT_ZERO) &&
-    saleCount.equals(BIGINT_ZERO);
-  let isCollector =
-    (mintCount.gt(BIGINT_ZERO) || buyCount.gt(BIGINT_ZERO)) &&
-    saleCount.equals(BIGINT_ZERO);
-  let isHunter =
-    mintCount.gt(BIGINT_ZERO) &&
-    buyCount.equals(BIGINT_ZERO) &&
-    saleCount.gt(BIGINT_ZERO);
-  let isFarmer =
-    mintCount.gt(BIGINT_ZERO) &&
-    buyCount.gt(BIGINT_ZERO) &&
-    saleCount.gt(BIGINT_ZERO);
-  let isTrader =
-    mintCount.equals(BIGINT_ZERO) &&
-    (buyCount.gt(BIGINT_ZERO) || saleCount.gt(BIGINT_ZERO));
-
-  // Update account with historical analysis
+  // Load the account entity by its ID from the subgraph's data store
+  // If the account doesn't exist (i.e., it hasn't been created), the function exits early
   let account = Account.load(accountId);
-  if (account != null) {
-    account.isOG = isOG; // Update isOG status
-    account.isCollector = isCollector; // Update isCollector status
-    account.isHunter = isHunter; // Update isHunter status
-    account.isFarmer = isFarmer; // Update isFarmer status
-    account.isTrader = isTrader; // Update isTrader status
-    account.save(); // Save the updated account entity to the store
+
+  // If no account was found, there's nothing to analyze, so we return immediately
+  if (!account) {
+    return;
   }
-}
 
-// Function to update account types based on their activities
-export function updateAccountTypes(account: Account): void {
-  const mintCount = account.mintCount || BIGINT_ZERO; // Get mint count or default to zero
-  const buyCount = account.buyCount || BIGINT_ZERO; // Get buy count or default to zero
-  const saleCount = account.saleCount || BIGINT_ZERO; // Get sale count or default to zero
+  // Initialize counters to track the total number of mint, buy, and sale events for the account
+  let totalMintCount = BIGINT_ZERO; // Start with zero mints
+  let totalBuyCount = BIGINT_ZERO; // Start with zero buys
+  let totalSaleCount = BIGINT_ZERO; // Start with zero sales
 
-  // Update account types based on activities
+  // This array is a placeholder for the events associated with the account's history
+  // In a real scenario, this would contain the events you want to analyze
+  let events: ethereum.Event[] = []; // We assume the events are available or retrieved from somewhere
+
+  // Loop through each event in the events array to process historical data
+  for (let i = 0; i < events.length; i++) {
+    let event = events[i]; // Get the current event in the loop
+
+    // Generate a unique ID for this historical event related to the account
+    // This ID ensures that each history record is unique, preventing overlap or conflicts
+    let historyId = getGlobalId(event, accountId);
+
+    // Load the corresponding AccountHistory entity using the unique history ID
+    // This will retrieve the historical record for this specific event if it exists
+    let history = AccountHistory.load(historyId);
+
+    // If a historical record exists, update the counters by adding the event counts
+    if (history) {
+      totalMintCount = totalMintCount.plus(history.mintCount); // Add the mint count from this history to the total
+      totalBuyCount = totalBuyCount.plus(history.buyCount); // Add the buy count from this history to the total
+      totalSaleCount = totalSaleCount.plus(history.saleCount); // Add the sale count from this history to the total
+    }
+  }
+
+  // Now that we have the total counts, we determine the account type
+  // These boolean flags will be set based on whether the account meets certain criteria
+
+  // OG: If the account has minted at least one token, it's an OG
   account.isOG =
-    mintCount.gt(BIGINT_ZERO) &&
-    buyCount.equals(BIGINT_ZERO) &&
-    saleCount.equals(BIGINT_ZERO);
-  account.isCollector =
-    (mintCount.gt(BIGINT_ZERO) || buyCount.gt(BIGINT_ZERO)) &&
-    saleCount.equals(BIGINT_ZERO);
-  account.isHunter =
-    mintCount.gt(BIGINT_ZERO) &&
-    buyCount.equals(BIGINT_ZERO) &&
-    saleCount.gt(BIGINT_ZERO);
-  account.isFarmer =
-    mintCount.gt(BIGINT_ZERO) &&
-    buyCount.gt(BIGINT_ZERO) &&
-    saleCount.gt(BIGINT_ZERO);
-  account.isTrader =
-    mintCount.equals(BIGINT_ZERO) &&
-    (buyCount.gt(BIGINT_ZERO) || saleCount.gt(BIGINT_ZERO));
+    totalMintCount.ge(BIGINT_ONE) &&
+    totalBuyCount.equals(BIGINT_ZERO) &&
+    totalSaleCount.equals(BIGINT_ZERO);
 
-  account.save(); // Save the updated account entity to the store
+  // Collector: If the account has minted and bought at least token, it's a Collector
+  account.isCollector =
+    totalMintCount.ge(BIGINT_ONE) &&
+    totalBuyCount.ge(BIGINT_ONE) &&
+    totalSaleCount.equals(BIGINT_ZERO);
+
+  // Hunter: If the account has minted and sold at least one Token, it's a Hunter
+  account.isHunter =
+    totalMintCount.ge(BIGINT_ONE) &&
+    totalSaleCount.ge(BIGINT_ONE) &&
+    totalBuyCount.equals(BIGINT_ZERO);
+
+  // Farmer: If the account has minted, bought, and sold at least one token, it's a Farmer
+  account.isFarmer =
+    totalMintCount.ge(BIGINT_ONE) &&
+    totalSaleCount.ge(BIGINT_ONE) &&
+    totalBuyCount.ge(BIGINT_ONE);
+
+  // Trader: If the account has not minted any but sold and bought at least one token, it's a Trader
+  account.isTrader =
+    totalMintCount.equals(BIGINT_ZERO) &&
+    totalSaleCount.ge(BIGINT_ONE) &&
+    totalBuyCount.ge(BIGINT_ONE);
+
+  // Finally, save the updated account entity back to the subgraph's data store
+  // This persists the changes we made, including the determined account types
+  account.save();
 }
 
 // Helper function to update transaction statistics

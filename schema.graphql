@@ -16,11 +16,11 @@ type Account @entity {
   mintCount: BigInt!
   buyCount: BigInt!
   saleCount: BigInt!
-  isOG: Boolean # True if the account only mints and holds
-  isCollector: Boolean # True if the account only mints/buys and holds
-  isHunter: Boolean # True if the account mints and sells but doesn't buy
-  isFarmer: Boolean # True if the account mints, sells, and engages in other transactions
-  isTrader: Boolean # True if the account only trades on OpenSea
+  isOG: Boolean # True if the account has only minted at least one Token and holds.
+  isCollector: Boolean # True if the account has minted one or more Tokens and has bought in OpenSea and holds
+  isHunter: Boolean # True if the account has minted one or more Tokens and sold one or more Tokens on OpenSea but doesn't buy.
+  isFarmer: Boolean # True if the account has minted one or more Tokens and sold and bought one or more Tokens on OpenSea
+  isTrader: Boolean # True if the account only bought and sold at least one Token in OpenSea
   totalAmountBought: BigInt! # The total value of NFTs bought
   totalAmountSold: BigInt! # The total value of NFTs sold
   totalAmountBalance: BigInt! # The total balance of the account in terms of cryptocurrency.
@@ -38,8 +38,6 @@ type AccountHistory @entity {
   mintCount: BigInt! # Mint count at the time of the history record
   buyCount: BigInt! # Buy count at the time of the history record
   saleCount: BigInt! # Sale count at the time of the history record
-  blockHash: Bytes!
-  txHash: Bytes!
 }
 
 # Represents Coven token Transfer/Mint Events

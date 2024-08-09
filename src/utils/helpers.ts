@@ -18,7 +18,7 @@ export function getGlobalId(event: ethereum.Event, accountId: string): string {
 }
 
 // This function creates or loads the CovenToken entity on demand.
-// We need it to carry values over to events where those values don't exist.
+// We need it to carry values over to events where those values don't exist (ordersMatched on OpenSea).
 export function getOrCreateCovenToken(
   event: ethereum.Event,
   accountId: string
@@ -54,8 +54,13 @@ export function getTokenId(
   // Calculate the previous log index (since TransferEvent comes first)
   let covenLogIndex = event.logIndex.minus(BIGINT_ONE);
 
-  // Generate the unique ID using the updated getGlobalId function that includes the account ID
-  let id = getGlobalId(event, accountId, covenLogIndex);
+  // Generate a unique ID using the event and accountId, incorporating covenLogIndex manually
+  let id = event.transaction.hash
+    .toHexString()
+    .concat("-")
+    .concat(covenLogIndex.toString())
+    .concat("-")
+    .concat(accountId);
 
   // Load the CovenToken entity using this ID
   let covenToken = CovenToken.load(id);
