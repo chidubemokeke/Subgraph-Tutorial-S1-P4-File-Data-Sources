@@ -366,32 +366,6 @@ export class AccountHistory extends Entity {
   set saleCount(value: BigInt) {
     this.set("saleCount", Value.fromBigInt(value));
   }
-
-  get blockHash(): Bytes {
-    let value = this.get("blockHash");
-    if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
-    } else {
-      return value.toBytes();
-    }
-  }
-
-  set blockHash(value: Bytes) {
-    this.set("blockHash", Value.fromBytes(value));
-  }
-
-  get txHash(): Bytes {
-    let value = this.get("txHash");
-    if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
-    } else {
-      return value.toBytes();
-    }
-  }
-
-  set txHash(value: Bytes) {
-    this.set("txHash", Value.fromBytes(value));
-  }
 }
 
 export class CovenToken extends Entity {
