@@ -1,53 +1,55 @@
-import { Bytes, log } from "@graphprotocol/graph-ts";
-import { CovenToken, CovenTracker, Transaction } from "../../generated/schema";
+import { BigInt, ethereum, Bytes, log } from "@graphprotocol/graph-ts";
+import {
+  Account,
+  AccountHistory,
+  CovenToken,
+  Transaction,
+} from "../../generated/schema";
 import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
 import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
 import {
   getOrCreateAccount,
-  updateAccountStatistics,
-  updateAccountTypes,
-  updateTransactionStatistics,
+  analyzeHistoricalData,
 } from "../utils/accountHelper";
+import {updateTransactionStatistics} from "../utils/helpers"
 import { BIGINT_ZERO, ZERO_ADDRESS } from "./constant";
 import { getGlobalId, getOrCreateCovenToken, getTokenId } from "./helpers";
 
+// Define an enumeration for transaction types: TRADE and MINT
 // Enum for Transaction Types
 export enum TransactionType {
   TRADE = "TRADE",
   MINT = "MINT",
 }
-// Define an enumeration for transaction types: TRADE and MINT
 
-// Helper function to load or create a Transaction entity
-export function loadOrCreateTransaction(
-  id: string,
+
+// This function creates or loads the Transaction entity on demand.
+// It ensures that we accurately track each transaction associated with an account.
+export function getOrCreateTransaction(
+  event: ethereum.Event,
   accountId: string
 ): Transaction {
-  // Attempt to load the transaction entity by its ID
-  let transaction = Transaction.load(id);
+  // Generate the unique ID using the getGlobalId function that includes the account ID
+  let transactionId = getGlobalId(event, accountId);
 
+  // Try to load the Transaction entity with this ID
+  let transaction = Transaction.load(transactionId);
+
+  // If it doesn't exist, create a new Transaction entity with this ID
   if (!transaction) {
-    // Create a new transaction entity if it does not exist
-    transaction = new Transaction(id);
-    transaction.account = accountId; // Set the account ID
-    transaction.buyer = Bytes.empty(); // Initialize buyer address
-    transaction.seller = Bytes.empty(); // Initialize seller address
-    transaction.tokenId = BIGINT_ZERO; // Initialize NFT information
-    transaction.type = TransType;
-    transaction.nftSalePrice = BIGINT_ZERO; // Initialize sale price
-    transaction.totalSold = BIGINT_ZERO; // Initialize total sold amount
-    transaction.blockNumber = BIGINT_ZERO; // Initialize block number
-    transaction.blockTimestamp = BIGINT_ZERO; // Initialize block timestamp
-    transaction.totalSalesVolume = BIGINT_ZERO; // Initialize total sales volume
-    transaction.averageSalePrice = BIGINT_ZERO; // Initialize average sale price
-    transaction.totalSalesCount = BIGINT_ZERO; // Initialize total sales count
-    transaction.highestSalePrice = BIGINT_ZERO; // Initialize highest sale price
-    transaction.lowestSalePrice = BIGINT_ZERO; // Initialize lowest sale price
-    transaction.save(); // Save the new transaction entity
+    transaction = new Transaction(transactionId);
+    transaction.account = accountId; // Link the transaction to the account
+    transaction.blockNumber = event.block.number; // Set the block number from the event
+    transaction.blockTimestamp = event.block.timestamp; // Set the timestamp of the event
+    transaction.type = TransactionType; // Initialize the type of transaction (e.g., TRADE, MINT)
+    transaction.amount = BIGINT_ZERO; // Initialize the transaction amount
+    transaction.isSuccessful = true; // Assume the transaction is successful unless flagged otherwise
   }
 
-  return transaction; // Return the loaded or newly created transaction entity
+  // Return the Transaction entity, either loaded or newly created
+  return transaction as Transaction;
 }
+
 
 // Helper function to handle Transfer events
 export function createTransfer(event: TransferEvent): void {
@@ -99,6 +101,61 @@ export function createTransfer(event: TransferEvent): void {
   fromAccount.save();
   toAccount.save();
 }
+
+// This function creates or loads the Transaction entity on demand.
+// It ensures that we accurately track each transaction associated with an account.
+export function getOrCreateTransaction(
+  event: ethereum.Event,
+  accountId: string
+): Transaction {
+  // Generate the unique ID using the getGlobalId function that includes the account ID
+  let transactionId = getGlobalId(event, accountId);
+
+  // Try to load the Transaction entity with this ID
+  let transaction = Transaction.load(transactionId);
+
+  // If it doesn't exist, create a new Transaction entity with this ID
+  if (!transaction) {
+    transaction = new Transaction(transactionId);
+    transaction.account = accountId; // Link the transaction to the account
+    transaction.blockNumber = event.block.number; // Set the block number from the event
+    transaction.blockHash = event.block.hash; // Set the block hash from the event
+    transaction.txHash = event.transaction.hash; // Set the transaction hash
+    transaction.timestamp = event.block.timestamp; // Set the timestamp of the event
+    transaction.type = ""; // Initialize the type of transaction (e.g., TRADE, MINT)
+    transaction.amount = BIGINT_ZERO; // Initialize the transaction amount
+    transaction.isSuccessful = true; // Assume the transaction is successful unless flagged otherwise
+  }
+
+  // Return the Transaction entity, either loaded or newly created
+  return transaction as Transaction;
+}
+
+// This helper function is designed to identify and assign transaction types
+export function assignTransactionType(
+  transaction: Transaction,
+  event: ethereum.Event
+): void {
+  // Depending on the event, we determine the type of transaction
+  // For example, based on event signatures, we might know if it’s a trade, mint, or other types.
+  
+  if (/* condition for TRADE */) {
+    transaction.type = TransactionType.TRADE;
+  } else if (/* condition for MINT */) {
+    transaction.type = TransactionType.MINT;
+  } else {
+    transaction.type = "UNKNOWN"; // Default to unknown if the type can't be determined
+  }
+
+  transaction.save(); // Save the updated transaction with its type
+}
+
+
+
+
+
+
+
 
 // Helper function to handle OrdersMatched events
 export function createOrdersMatched(event: OrdersMatchedEvent): void {
