@@ -38,6 +38,8 @@ type AccountHistory @entity {
   mintCount: BigInt! # Mint count at the time of the history record
   buyCount: BigInt! # Buy count at the time of the history record
   saleCount: BigInt! # Sale count at the time of the history record
+  blockNumber: BigInt! # The block number when this entity was last updated. Helps in tracking historical changes.
+  blockTimestamp: BigInt!
 }
 
 # Represents Coven token Transfer/Mint Events
@@ -60,7 +62,6 @@ type CovenToken @entity {
 type Transaction @entity {
   id: ID! # A unique identifier for each transaction.
   account: Account!
-  nft: CovenToken! # NFT being transferred. Many-to-One relationship: Each transaction involves one NFT (token)
   transactionType: TransactionType!
   buyer: Bytes # The address of the buyer (for sales).
   seller: Bytes # The address of the seller (for sales).

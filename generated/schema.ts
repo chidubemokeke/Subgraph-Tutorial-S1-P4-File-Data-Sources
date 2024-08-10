@@ -366,6 +366,32 @@ export class AccountHistory extends Entity {
   set saleCount(value: BigInt) {
     this.set("saleCount", Value.fromBigInt(value));
   }
+
+  get blockNumber(): BigInt {
+    let value = this.get("blockNumber");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set blockNumber(value: BigInt) {
+    this.set("blockNumber", Value.fromBigInt(value));
+  }
+
+  get blockTimestamp(): BigInt {
+    let value = this.get("blockTimestamp");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set blockTimestamp(value: BigInt) {
+    this.set("blockTimestamp", Value.fromBigInt(value));
+  }
 }
 
 export class CovenToken extends Entity {
@@ -594,19 +620,6 @@ export class Transaction extends Entity {
 
   set account(value: string) {
     this.set("account", Value.fromString(value));
-  }
-
-  get nft(): string {
-    let value = this.get("nft");
-    if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
-    } else {
-      return value.toString();
-    }
-  }
-
-  set nft(value: string) {
-    this.set("nft", Value.fromString(value));
   }
 
   get transactionType(): string {

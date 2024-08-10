@@ -1,6 +1,8 @@
-import { BigInt, ethereum } from "@graphprotocol/graph-ts";
-import { CovenToken, Transaction } from "../../generated/schema";
-import { BIGINT_ZERO, BIGINT_ONE } from "./constant";
+import { BigInt, Bytes, ethereum, log } from "@graphprotocol/graph-ts";
+import { CovenToken, Transaction, Account } from "../../generated/schema";
+import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
+import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
+import { BIGINT_ZERO, BIGINT_ONE, CRYPTOCOVEN_ADDRESS } from "./constant";
 
 // Helper function to generate a unique ID for tracking log indices and account-specific history
 export function getGlobalId(event: ethereum.Event, accountId: string): string {
@@ -117,6 +119,32 @@ export function updateTransactionStatistics(
 
   // Save the updated transaction entity
   transaction.save();
+}
+
+export function getTransferEventsForTransaction(
+  transactionHash: Bytes
+): TransferEvent[] {
+  let transferEvents: TransferEvent[] = [];
+
+  // Access transaction logs for the given transaction hash
+  let logs = ethereum.getTransactionLogs(transactionHash);
+  for (let i = 0; i < logs.length; i++) {
+    let log = logs[i];
+
+    if (log.address == CRYPTOCOVEN_ADDRESS) {
+      let transferEvent = TransferEvent.bind(log.address);
+      // Decode the log to extract Transfer event parameters
+      let from = log.topics[1].toAddress();
+      let to = log.topics[2].toAddress();
+      let tokenId = BigInt.fromString(log.data.toHexString()); // Assuming the tokenId is in log.data
+
+      transferEvents.push(
+        new TransferEvent(from, to, tokenId, log.transactionHash, log.logIndex)
+      );
+    }
+  }
+
+  return transferEvents;
 }
 
 // Helper function to get owner from previous TransferEvent
