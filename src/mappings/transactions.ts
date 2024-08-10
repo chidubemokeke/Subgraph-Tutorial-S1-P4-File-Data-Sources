@@ -137,11 +137,18 @@ export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
     }
   }
 
-  // Calculate average sale price
+  // Set the transaction fields
+  transaction.buyer = event.params.taker; // Set buyer's address
+  transaction.seller = event.params.maker; // Set seller's address
+  transaction.nftSalePrice = salePrice; // Set sale price per NFT
   transaction.totalSalesVolume = totalSaleVolume; // Set total sales volume
   transaction.averageSalePrice = totalSaleVolume.div(transaction.totalNFTsSold); // Compute average sale price
   transaction.highestSalePrice = highestSalePrice; // Set highest sale price
   transaction.lowestSalePrice = lowestSalePrice; // Set lowest sale price
+  transaction.transactionCount = transaction.transactionCount.plus(BIGINT_ONE); // Increment transaction count
+  transaction.totalSalesCount = transaction.totalSalesCount.plus(
+    transaction.totalNFTsSold
+  ); // Increment total sales count
 
   // Save the updated Transaction entity
   transaction.save();
@@ -149,11 +156,14 @@ export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
   // Update seller's and buyer's account details with trade information
   sellerAccount.totalAmountSold =
     sellerAccount.totalAmountSold.plus(totalSaleVolume); // Increment total amount sold for seller
-  buyerAccount.totalAmountBought =
-    buyerAccount.totalAmountBought.plus(totalSaleVolume); // Increment total amount bought for buyer
+  sellerAccount.saleCount = sellerAccount.saleCount.plus(BIGINT_ONE); // Increment sale count for seller
   sellerAccount.activityCount = sellerAccount.activityCount.plus(
     transaction.totalNFTsSold
   ); // Increment activity count for seller
+
+  buyerAccount.totalAmountBought =
+    buyerAccount.totalAmountBought.plus(totalSaleVolume); // Increment total amount bought for buyer
+  buyerAccount.buyCount = buyerAccount.buyCount.plus(BIGINT_ONE); // Increment buy count for buyer
   buyerAccount.activityCount = buyerAccount.activityCount.plus(
     transaction.totalNFTsSold
   ); // Increment activity count for buyer
