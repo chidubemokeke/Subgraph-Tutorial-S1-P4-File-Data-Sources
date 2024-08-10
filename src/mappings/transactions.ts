@@ -1,28 +1,17 @@
-import { BigInt, ethereum, log } from "@graphprotocol/graph-ts";
+import { BigInt } from "@graphprotocol/graph-ts";
 import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
 import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
-import {
-  Account,
-  Transaction,
-  CovenToken,
-  AccountHistory,
-} from "../../generated/schema";
 import {
   getOrCreateAccount,
   analyzeHistoricalData,
 } from "../utils/accountHelper";
 import {
-  getGlobalId,
   getOrCreateCovenToken,
   getTokenId,
+  fetchTransferEvents,
 } from "../utils/helpers";
 import { getOrCreateTransaction } from "../utils/transactionHelper";
-import {
-  ZERO_ADDRESS,
-  BIGINT_ZERO,
-  BIGINT_ONE,
-  CRYPTOCOVEN_ADDRESS,
-} from "../utils/constant";
+import { ZERO_ADDRESS, BIGINT_ZERO, BIGINT_ONE } from "../utils/constant";
 
 // Handles a transfer event which could be a mint or a standard transfer
 export function handleTransfer(event: TransferEvent): void {
@@ -30,8 +19,17 @@ export function handleTransfer(event: TransferEvent): void {
   // Load or create account entities for 'from' and 'to' addresses
   let fromAccount = getOrCreateAccount(event.params.from.toHex()); // Get or create the account entity for the sender
   let toAccount = getOrCreateAccount(event.params.to.toHex()); // Get or create the account entity for the recipient
-  let tokenTracker = event.params.tokenId; // Array of token IDs being transferred
+  //let tokenTracker = event.params.tokenId; // Array of token IDs being transferred
 
+  // Handle tokenTracker as either a single token or an array of tokens
+  let tokenTracker: BigInt[];
+
+  // Check if event.params.tokenId is an array
+  if (Array.isArray(event.params.tokenId)) {
+    tokenTracker = event.params.tokenId as BigInt[]; // Cast to BigInt array if it's an array
+  } else {
+    tokenTracker = [event.params.tokenId as BigInt]; // Treat as a single-item array if it's a single value
+  }
   // Determine if this is a mint event by checking if 'from' is the zero address
   let isMint = ZERO_ADDRESS;
 
@@ -46,7 +44,7 @@ export function handleTransfer(event: TransferEvent): void {
       // Handle minting event
       covenToken.owner = toAccount.id; // After minting, the token's owner is the recipient
       covenToken.timestamp = event.block.timestamp; // Record the timestamp of the mint event
-      covenToken.tokenId = event.params.tokenId;
+      covenToken.tokenId = tokenTracker[i];
     } else {
       // Handle standard transfer event
       covenToken.owner = toAccount.id; // Update the token's owner to the new address
@@ -104,13 +102,14 @@ export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
   // Check for TransferEvents related to the current event (you need to know how you receive these logs)
   // Note: This is just a placeholder; adjust as needed based on your actual event structure.
   // Access relevant logs for this event
-  let transferEvents = ; // Adjust this based on how you access transfer events
+  let transferEvents = fetchTransferEvents(event); // Adjust this based on how you access transfer events
 
+  // Process each transfer event to retrieve token IDs
   for (let i = 0; i < transferEvents.length; i++) {
     let transferEvent = transferEvents[i];
 
     // Retrieve the token ID from the TransferEvent
-    let tokenIdFromTransfer = getTokenId(transferEvent.event, seller);
+    let tokenIdFromTransfer = getTokenId(event, seller);
 
     // If a token ID is found, add it to the array of token IDs
     if (tokenIdFromTransfer) {
@@ -130,7 +129,6 @@ export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
       covenToken.owner = buyer; // Set the new owner of the token
       covenToken.save(); // Save the updated CovenToken entity
     }
-
     // Update transaction details
     transaction.totalNFTsSold = transaction.totalNFTsSold.plus(BIGINT_ONE); // Increment total NFTs sold
     totalSaleVolume = totalSaleVolume.plus(salePrice); // Accumulate total sale volume

@@ -1,8 +1,10 @@
-import { BigInt, Bytes, ethereum, log } from "@graphprotocol/graph-ts";
-import { CovenToken, Transaction, Account } from "../../generated/schema";
-import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
-import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
-import { BIGINT_ZERO, BIGINT_ONE, CRYPTOCOVEN_ADDRESS } from "./constant";
+import { BigInt, Address, Bytes, ethereum, log } from "@graphprotocol/graph-ts";
+import { CovenToken, Transaction } from "../../generated/schema";
+import {
+  BIGINT_ZERO,
+  BIGINT_ONE,
+  TRANSFER_EVENT_SIGNATURE_HASH,
+} from "./constant";
 
 // Helper function to generate a unique ID for tracking log indices and account-specific history
 export function getGlobalId(event: ethereum.Event, accountId: string): string {
@@ -121,33 +123,162 @@ export function updateTransactionStatistics(
   transaction.save();
 }
 
-export function getTransferEventsForTransaction(
-  transactionHash: Bytes
-): TransferEvent[] {
-  let transferEvents: TransferEvent[] = [];
+// Function to fetch Transfer events from a given Ethereum event
+export function fetchTransferEvents(event: ethereum.Event): CovenToken[] {
+  // Initialize an empty array to store transfer event objects
+  let transferEvents: CovenToken[] = [];
 
-  // Access transaction logs for the given transaction hash
-  let logs = ethereum.getTransactionLogs(transactionHash);
-  for (let i = 0; i < logs.length; i++) {
-    let log = logs[i];
+  // Loop through all logs associated with the transaction
+  for (let i = 0; i < event.receipt!.logs.length; i++) {
+    // Access each log entry in the transaction receipt
+    let log = event.receipt!.logs[i];
 
-    if (log.address == CRYPTOCOVEN_ADDRESS) {
-      let transferEvent = TransferEvent.bind(log.address);
-      // Decode the log to extract Transfer event parameters
-      let from = log.topics[1].toAddress();
-      let to = log.topics[2].toAddress();
-      let tokenId = BigInt.fromString(log.data.toHexString()); // Assuming the tokenId is in log.data
+    // Check if the log corresponds to a Transfer event
+    // The first topic of the log contains the event signature hash
+    // Compare it with the known Transfer event signature hash
+    if (log.topics[0].toHexString() == TRANSFER_EVENT_SIGNATURE_HASH) {
+      // Decode the log's topics and data into the parameters needed for CovenToken
+      // Extract 'from' address from the first topic (index 1)
+      let from = Address.fromHexString(log.topics[1].toHexString());
 
-      transferEvents.push(
-        new TransferEvent(from, to, tokenId, log.transactionHash, log.logIndex)
-      );
+      // Extract 'to' address from the second topic (index 2)
+      let to = Address.fromHexString(log.topics[2].toHexString());
+
+      // Extract the tokenId from the log's data
+      // Assume tokenId is the first 32 bytes of the log data
+      let tokenIdBytes = log.data.subarray(0, 32) as Bytes; // Extract the first 32 bytes
+      let tokenId = BigInt.fromUnsignedBytes(tokenIdBytes); // Convert bytes to BigInt
+
+      // Extract additional data from the log's data
+      // Assume amount is the next 32 bytes after tokenId
+      let amount = log.data.subarray(32, 64) as Bytes; // Extract the next 32 bytes for amount
+      // Convert the amount bytes to a BigInt if necessary
+      let amountBigInt = BigInt.fromUnsignedBytes(amount); // Convert bytes to BigInt
+      // Extract referenceId as a hexadecimal string (example handling)
+      let referenceId = log.data.toHexString(); // Convert entire log data to hex string
+
+      // Create a unique ID for this transfer event using the transaction hash and log index
+      let uniqueId = event.transaction.hash
+        .toHexString()
+        .concat("-")
+        .concat(i.toString()); // Combine transaction hash and log index to form unique ID
+
+      // Create a new CovenToken entity with the unique ID
+      let transferEvent = new CovenToken(uniqueId);
+
+      // Set the fields of the CovenToken entity
+      transferEvent.from = from.toHex(); // Set the 'from' address as hex string
+      transferEvent.to = to.toHex(); // Set the 'to' address as hex string
+      transferEvent.owner = to.toHexString(); // Set the new owner address (receiver)
+      transferEvent.tokenId = tokenId; // Set the tokenId of the transferred token
+      transferEvent.amount = amountBigInt; // Set the amount of tokens transferred
+      transferEvent.referenceId = referenceId; // Set a reference ID for the transaction
+      transferEvent.blockNumber = event.block.number; // Record the block number of the transaction
+      transferEvent.blockHash = event.block.hash; // Record the block hash of the transaction
+      transferEvent.txHash = event.transaction.hash; // Record the transaction hash
+      transferEvent.timestamp = event.block.timestamp; // Record the block timestamp
+
+      // Add the decoded CovenToken object to the transferEvents array
+      transferEvents.push(transferEvent);
     }
   }
 
+  // Return the array of CovenToken objects containing all extracted transfer events
   return transferEvents;
 }
 
-// Helper function to get owner from previous TransferEvent
+// Function to fetch Transfer events from a given Ethereum event
+/**export function fetchTransferEvents(event: ethereum.Event): CovenToken[] {
+  let transferEvents: CovenToken[] = [];
+
+  // Loop through all logs associated with the transaction
+  for (let i = 0; i < event.receipt!.logs.length; i++) {
+    let log = event.receipt!.logs[i];
+
+    // Check if the log corresponds to a Transfer event
+    // Compare the log's topic[0] with the computed event signature hash
+    if (log.topics[0].toHexString() == TRANSFER_EVENT_SIGNATURE_HASH) {
+      // Decode the log's topics and data into the parameters needed for CovenToken
+      // Extract 'from' address from the first topic
+      let from = Address.fromHexString(log.topics[1].toHexString());
+      // Extract 'to' address from the second topic
+      let to = Address.fromHexString(log.topics[2].toHexString());
+
+      // Extract the tokenId from the log's data
+      // Assuming tokenId is the first 32 bytes of the log data
+      let tokenIdBytes = log.data.subarray(0, 32) as Bytes; // Cast to Bytes type
+      let tokenId = BigInt.fromUnsignedBytes(tokenIdBytes);
+
+      // Extract additional data if required (example handling)
+      // Assuming amount is the next 32 bytes after tokenId
+      let amount = log.data.subarray(32, 64) as Bytes; // Cast to Bytes type
+      // Extract referenceId as a hexadecimal string (for example purposes)
+      let referenceId = log.data.toHexString();
+
+      // Create a unique ID for this transfer event using the transaction hash and log index
+      let uniqueId = event.transaction.hash
+        .toHexString()
+        .concat("-")
+        .concat(i.toString());
+
+      // Create or update the CovenToken entity
+      let transferEvent = new CovenToken(uniqueId);
+      transferEvent.from = from.toHex(); // Set the 'from' address
+      transferEvent.to = to.toHex(); // Set the 'to' address
+      transferEvent.owner = to.toHexString(); // Set the new owner address (receiver)
+      transferEvent.tokenId = tokenId; // Set the tokenId
+      transferEvent.amount = BigInt.fromUnsignedBytes(amount); // Example handling of amount
+      transferEvent.referenceId = referenceId; // Example handling of referenceId
+      transferEvent.blockNumber = event.block.number; // Set the block number
+      transferEvent.blockHash = event.block.hash; // Set the block hash
+      transferEvent.txHash = event.transaction.hash; // Set the transaction hash
+      transferEvent.timestamp = event.block.timestamp; // Set the block timestamp
+
+      // Add the decoded CovenToken object to the transferEvents array
+      transferEvents.push(transferEvent);
+    }
+  }
+
+  // Return the array of CovenToken objects
+  return transferEvents;
+}
+
+// Function to fetch Transfer events related to a specific transaction
+/**export function fetchTransferEvents(event: ethereum.Event): TransferEvent[] {
+  let transferEvents: TransferEvent[] = [];
+
+  // Loop through all logs associated with the transaction
+  for (let i = 0; i < event.receipt!.logs.length; i++) {
+    let log = event.receipt!.logs[i];
+
+    // Check if the log corresponds to a Transfer event (based on the event signature)
+    if (log.topics[0].toHexString() == CRYPTOCOVEN_ADDRESS) {
+      // Decode the log into the parameters needed for TransferEvent
+      let from = Address.fromHexString(log.topics[1].toHexString());
+      let to = Address.fromHexString(log.topics[2].toHexString());
+
+      //The subarray method returns a TypedArray, which isn't directly compatible with The Graph's Bytes type.
+      // By casting log.data.subarray(0, 32) to Bytes, we make it compatible with BigInt.fromUnsignedBytes.
+      // Extract the tokenId from the log data, assuming it occupies the first 32 bytes
+      let tokenIdBytes = log.data.subarray(0, 32) as Bytes; // Cast to Bytes type
+      let tokenId = BigInt.fromUnsignedBytes(tokenIdBytes);
+
+      // Create a new TransferEvent object
+      let transferEvent = new TransferEvent(
+        event.address, // Contract address
+        from!, // Sender address
+        to!, // Recipient address
+        tokenId // Token ID
+      );
+
+      // Push the decoded TransferEvent object to the transferEvents array
+      transferEvents.push(transferEvent);
+    }
+  }
+
+  // Return the array of TransferEvent objects
+  return transferEvents;
+}
 /**export function getTokenOwner(event: ethereum.Event): Bytes | null {
   let previousLogIndex = event.logIndex.minus(BigInt.fromI32(1));
   let id = event.transaction.hash
