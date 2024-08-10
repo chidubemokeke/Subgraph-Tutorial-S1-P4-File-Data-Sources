@@ -1,4 +1,4 @@
-import { BigInt, Address, Bytes, ethereum, log } from "@graphprotocol/graph-ts";
+import { BigInt, Address, Bytes, ethereum } from "@graphprotocol/graph-ts";
 import { CovenToken, Transaction } from "../../generated/schema";
 import {
   BIGINT_ZERO,
