@@ -1,16 +1,15 @@
 import { BigInt, ethereum, Address, Bytes } from "@graphprotocol/graph-ts";
-import { Account, AccountHistory, CovenToken } from "../../generated/schema";
+import { Account, CovenToken } from "../../generated/schema";
 import {
   BIGINT_ONE,
   BIGINT_ZERO,
   TRANSFER_EVENT_SIGNATURE_HASH,
 } from "./constant";
-import { getGlobalId } from "./helpers";
 
 // Enum for Transaction Types
 export enum TransactionType {
-  TRADE = "TRADE",
-  MINT = "MINT",
+  TRADE = 0,
+  MINT = 1,
 }
 
 export function getOrCreateAccount(accountId: string): Account {

@@ -9,6 +9,12 @@ import { getOrCreateCovenToken, fetchTransferEvents } from "../utils/helpers";
 import { getOrCreateTransaction } from "../utils/transactionHelper";
 import { ZERO_ADDRESS, BIGINT_ZERO, BIGINT_ONE } from "../utils/constant";
 
+// Enum for Transaction Types
+export enum TransactionType {
+  TRADE = 0,
+  MINT = 1,
+}
+
 // Handles a transfer event which could be a mint or a standard transfer
 export function handleTransfer(event: TransferEvent): void {
   // Extract data from the Transfer event
@@ -17,20 +23,13 @@ export function handleTransfer(event: TransferEvent): void {
   let toAccount = getOrCreateAccount(event.params.to.toHex()); // Get or create the account entity for the recipient
   let tokenId = event.params.tokenId; // Extract token ID from the event parameters
 
-  // Handle tokenTracker as either a single token or an array of tokens
-  let tokenTracker: BigInt[];
-
-  // Check if event.params.tokenId is an array
-  if (Array.isArray(tokenId)) {
-    tokenTracker = tokenId as BigInt[]; // Cast to BigInt array if it's an array
-  } else {
-    tokenTracker = [tokenId as BigInt]; // Treat as a single-item array if it's a single value
-  }
+  // Token ID should be handled as a single value for each event (There could be edge cases though with multiple tokens)
+  let tokenTracker: BigInt[] = [tokenId];
 
   // Determine if this is a mint event by checking if 'from' is the zero address
-  let isMint = ZERO_ADDRESS;
+  let isMint = event.params.from.toHex() == ZERO_ADDRESS.toHex();
 
-  // Iterate over each token ID (to handle multiple tokens minted in one transaction)
+  // Iterate over each token ID
   for (let i = 0; i < tokenTracker.length; i++) {
     let currentTokenId = tokenTracker[i].toString(); // Convert current token ID to string
 
@@ -65,15 +64,13 @@ export function handleTransfer(event: TransferEvent): void {
     analyzeAccountHistory(event, toAccount.id);
   }
 
-  // Create or load the Transaction entity for the mint or transfer event
-  let transactionType = isMint ? "MINT" : "TRANSFER"; // Set transaction type based on the event
-  let transaction = getOrCreateTransaction(event, transactionType); // Retrieve or initialize the Transaction entity
+  let transactionType: TransactionType = isMint
+    ? TransactionType.MINT
+    : TransactionType.TRADE;
+  let transaction = getOrCreateTransaction(event, 1);
 
-  // Increment total NFTs sold in the transaction
-  transaction.totalNFTsSold = transaction.totalNFTsSold.plus(
-    BigInt.fromI32(tokenTracker.length)
-  );
-  transaction.save(); // Save the updated Transaction entity
+  transaction.totalNFTsSold = transaction.totalNFTsSold.plus(BIGINT_ONE);
+  transaction.save();
 }
 
 // Handles an OpenSea sale event
@@ -88,7 +85,7 @@ export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
   let buyerAccount = getOrCreateAccount(buyer); // Ensure buyer account exists
 
   // Create or retrieve a Transaction entity for this trade
-  let transaction = getOrCreateTransaction(event, "TRADE"); // Initialize transaction record
+  let transaction = getOrCreateTransaction(event, 0); // Initialize transaction record
 
   // Initialize variables to track sale details
   let totalSaleVolume = BIGINT_ZERO; // Total value of NFTs sold in this transaction
@@ -100,7 +97,7 @@ export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
 
   // Fetch transfer events related to the current sale event
   // Note: Cast `event` to `ethereum.Event` to use with `fetchTransferEvents`
-  let transferEvents = fetchTransferEvents(event as unknown as ethereum.Event);
+  let transferEvents = fetchTransferEvents(event as ethereum.Event);
 
   // Iterate through each transfer event to retrieve token IDs
   for (let i = 0; i < transferEvents.length; i++) {
@@ -123,9 +120,7 @@ export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
     }
 
     // Update transaction details with sale information
-    transaction.totalNFTsSold = transaction.totalNFTsSold.plus(
-      transaction.totalNFTsSold
-    ); // Increment total NFTs sold
+    transaction.totalNFTsSold = transaction.totalNFTsSold.plus(BIGINT_ONE); // Increment total NFTs sold
     totalSaleVolume = totalSaleVolume.plus(salePrice); // Add sale price to total sale volume
 
     // Update highest and lowest sale prices
@@ -176,3 +171,19 @@ export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
   analyzeAccountHistory(event, sellerAccount.id); // Analyze seller's historical data
   analyzeAccountHistory(event, buyerAccount.id); // Analyze buyer's historical data
 }
+
+/*// Check if event.params.tokenId is an array
+  if (Array.isArray(tokenId)) {
+    tokenTracker = tokenId as BigInt[]; // Cast to BigInt array if it's an array
+  } else {
+    tokenTracker = [tokenId as BigInt]; // Treat as a single-item array if it's a single value
+  }
+
+
+  // Iterate over each token ID (to handle multiple tokens minted in one transaction)
+  for (let i = 0; i < tokenTracker.length; i++) {
+    let currentTokenId = tokenTracker[i].toString(); // Convert current token ID to string
+
+    // Use getOrCreateCovenToken to ensure a CovenToken entity exists
+    let covenToken = getOrCreateCovenToken(event, currentTokenId);
+*/

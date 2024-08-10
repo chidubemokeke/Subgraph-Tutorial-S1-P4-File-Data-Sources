@@ -1,5 +1,5 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts";
-import { keccak256, toUtf8Bytes } from "ethers";
+import { crypto } from "@graphprotocol/graph-ts";
 
 export const BIGINT_ZERO = BigInt.fromI32(0);
 export const BIGINT_ONE = BigInt.fromI32(1);
@@ -9,6 +9,17 @@ export const ZERO_ADDRESS = Bytes.fromHexString(
 
 // Define the event signature for the Transfer event
 export const TRANSFER_EVENT_SIGNATURE = "Transfer(address,address,uint256)";
+
+// Convert the event signature to a Bytes object
+let eventSignatureBytes = Bytes.fromUTF8(TRANSFER_EVENT_SIGNATURE);
+
+// Compute the Keccak-256 (SHA3-256) hash of the event signature
+export const TRANSFER_EVENT_SIGNATURE_HASH = crypto
+  .keccak256(eventSignatureBytes)
+  .toHexString();
+
+// Define the event signature for the Transfer event
+/**export const TRANSFER_EVENT_SIGNATURE = "Transfer(address,address,uint256)";
 
 // Compute the Keccak-256 (SHA3-256) hash of the event signature
 export const TRANSFER_EVENT_SIGNATURE_HASH = keccak256(
