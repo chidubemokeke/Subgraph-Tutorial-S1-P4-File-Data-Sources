@@ -3,13 +3,9 @@ import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCov
 import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
 import {
   getOrCreateAccount,
-  analyzeHistoricalData,
+  analyzeAccountHistory,
 } from "../utils/accountHelper";
-import {
-  getOrCreateCovenToken,
-  getTokenId,
-  fetchTransferEvents,
-} from "../utils/helpers";
+import { getOrCreateCovenToken, fetchTransferEvents } from "../utils/helpers";
 import { getOrCreateTransaction } from "../utils/transactionHelper";
 import { ZERO_ADDRESS, BIGINT_ZERO, BIGINT_ONE } from "../utils/constant";
 
@@ -19,42 +15,43 @@ export function handleTransfer(event: TransferEvent): void {
   // Load or create account entities for 'from' and 'to' addresses
   let fromAccount = getOrCreateAccount(event.params.from.toHex()); // Get or create the account entity for the sender
   let toAccount = getOrCreateAccount(event.params.to.toHex()); // Get or create the account entity for the recipient
-  //let tokenTracker = event.params.tokenId; // Array of token IDs being transferred
+  let tokenId = event.params.tokenId; // Extract token ID from the event parameters
 
   // Handle tokenTracker as either a single token or an array of tokens
   let tokenTracker: BigInt[];
 
   // Check if event.params.tokenId is an array
-  if (Array.isArray(event.params.tokenId)) {
-    tokenTracker = event.params.tokenId as BigInt[]; // Cast to BigInt array if it's an array
+  if (Array.isArray(tokenId)) {
+    tokenTracker = tokenId as BigInt[]; // Cast to BigInt array if it's an array
   } else {
-    tokenTracker = [event.params.tokenId as BigInt]; // Treat as a single-item array if it's a single value
+    tokenTracker = [tokenId as BigInt]; // Treat as a single-item array if it's a single value
   }
+
   // Determine if this is a mint event by checking if 'from' is the zero address
   let isMint = ZERO_ADDRESS;
 
-  // Iterate over each token ID (To keep track of multiple tokens minted in one transaction)
+  // Iterate over each token ID (to handle multiple tokens minted in one transaction)
   for (let i = 0; i < tokenTracker.length; i++) {
-    let tokenId = tokenTracker[i].toString(); // Convert token ID to string format
+    let currentTokenId = tokenTracker[i].toString(); // Convert current token ID to string
 
     // Use getOrCreateCovenToken to ensure a CovenToken entity exists
-    let covenToken = getOrCreateCovenToken(event, tokenId);
+    let covenToken = getOrCreateCovenToken(event, currentTokenId);
 
     if (isMint) {
       // Handle minting event
-      covenToken.owner = toAccount.id; // After minting, the token's owner is the recipient
+      covenToken.owner = toAccount.id; // Set the owner of the minted token to the recipient
       covenToken.timestamp = event.block.timestamp; // Record the timestamp of the mint event
-      covenToken.tokenId = tokenTracker[i];
+      covenToken.tokenId = tokenTracker[i]; // Set the token ID
     } else {
       // Handle standard transfer event
       covenToken.owner = toAccount.id; // Update the token's owner to the new address
     }
 
-    // Save the updated Token and CovenToken entities to the subgraph
-    covenToken.save(); // Ensure the CovenToken entity is saved
+    // Save the updated CovenToken entity
+    covenToken.save();
 
     if (isMint) {
-      toAccount.mintCount = toAccount.mintCount.plus(toAccount.mintCount); // Increment mint count
+      toAccount.mintCount = toAccount.mintCount.plus(BIGINT_ONE); // Increment mint count
     } else {
       fromAccount.activityCount = fromAccount.activityCount.plus(BIGINT_ONE); // Increment activity count for sender
       toAccount.activityCount = toAccount.activityCount.plus(BIGINT_ONE); // Increment activity count for receiver
@@ -63,19 +60,23 @@ export function handleTransfer(event: TransferEvent): void {
     fromAccount.save();
     toAccount.save();
 
-    analyzeHistoricalData(fromAccount.id);
-    analyzeHistoricalData(toAccount.id);
+    // Analyze the historical data for both accounts
+    analyzeAccountHistory(event, fromAccount.id);
+    analyzeAccountHistory(event, toAccount.id);
   }
 
   // Create or load the Transaction entity for the mint or transfer event
-  let transactionType = isMint ? "MINT" : "TRANSFER";
-  let transaction = getOrCreateTransaction(event, transactionType);
+  let transactionType = isMint ? "MINT" : "TRANSFER"; // Set transaction type based on the event
+  let transaction = getOrCreateTransaction(event, transactionType); // Retrieve or initialize the Transaction entity
+
+  // Increment total NFTs sold in the transaction
   transaction.totalNFTsSold = transaction.totalNFTsSold.plus(
     BigInt.fromI32(tokenTracker.length)
-  ); // Increment total NFTs sold
-  transaction.save();
+  );
+  transaction.save(); // Save the updated Transaction entity
 }
 
+// Handles an OpenSea sale event
 export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
   // Extract relevant data from the OrdersMatched event
   let seller = event.params.maker.toHex(); // Seller's address
@@ -122,7 +123,9 @@ export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
     }
 
     // Update transaction details with sale information
-    transaction.totalNFTsSold = transaction.totalNFTsSold.plus(BIGINT_ONE); // Increment total NFTs sold
+    transaction.totalNFTsSold = transaction.totalNFTsSold.plus(
+      transaction.totalNFTsSold
+    ); // Increment total NFTs sold
     totalSaleVolume = totalSaleVolume.plus(salePrice); // Add sale price to total sale volume
 
     // Update highest and lowest sale prices
@@ -160,6 +163,6 @@ export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
   buyerAccount.save();
 
   // Analyze historical data for the seller and buyer accounts
-  analyzeHistoricalData(sellerAccount.id); // Analyze seller's historical data
-  analyzeHistoricalData(buyerAccount.id); // Analyze buyer's historical data
+  analyzeAccountHistory(event, sellerAccount.id); // Analyze seller's historical data
+  analyzeAccountHistory(event, buyerAccount.id); // Analyze buyer's historical data
 }
