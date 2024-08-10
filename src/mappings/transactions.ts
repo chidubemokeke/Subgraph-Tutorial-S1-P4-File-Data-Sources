@@ -1,4 +1,4 @@
-import { BigInt } from "@graphprotocol/graph-ts";
+import { BigInt, ethereum } from "@graphprotocol/graph-ts";
 import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
 import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
 import {
@@ -76,86 +76,78 @@ export function handleTransfer(event: TransferEvent): void {
   transaction.save();
 }
 
-// Handles a trade event (e.g., OrdersMatched from OpenSea)
 export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
-  // Extract data from the OrdersMatched event
-  let seller = event.params.maker.toHex(); // The address of the seller
-  let buyer = event.params.taker.toHex(); // The address of the buyer
+  // Extract relevant data from the OrdersMatched event
+  let seller = event.params.maker.toHex(); // Seller's address
+  let buyer = event.params.taker.toHex(); // Buyer's address
   let salePrice = event.params.price; // Sale price per token
 
-  // Get or create Account entities for both seller and buyer
-  let sellerAccount = getOrCreateAccount(seller);
-  let buyerAccount = getOrCreateAccount(buyer);
+  // Retrieve or create Account entities for both seller and buyer
+  let sellerAccount = getOrCreateAccount(seller); // Ensure seller account exists
+  let buyerAccount = getOrCreateAccount(buyer); // Ensure buyer account exists
 
-  // Create or load the Transaction entity
-  let transaction = getOrCreateTransaction(event, "TRADE");
+  // Create or retrieve a Transaction entity for this trade
+  let transaction = getOrCreateTransaction(event, "TRADE"); // Initialize transaction record
 
-  // Initialize variables to track the sale details
+  // Initialize variables to track sale details
   let totalSaleVolume = BIGINT_ZERO; // Total value of NFTs sold in this transaction
-  let highestSalePrice = BIGINT_ZERO; // Highest price of a single NFT sold in this transaction
-  let lowestSalePrice = BIGINT_ZERO; // Lowest price of a single NFT sold in this transaction
+  let highestSalePrice = BIGINT_ZERO; // Highest price of a single NFT in this transaction
+  let lowestSalePrice = BIGINT_ZERO; // Lowest price of a single NFT in this transaction
 
-  // Initialize an array to hold token IDs involved in the trade
-  let tokenIds: string[] = []; // Array to store token IDs involved in the trade
+  // Array to store token IDs involved in the trade
+  let tokenIds: string[] = [];
 
-  // Since event.transaction.logs doesn't exist, process relevant events directly
-  // Check for TransferEvents related to the current event (you need to know how you receive these logs)
-  // Note: This is just a placeholder; adjust as needed based on your actual event structure.
-  // Access relevant logs for this event
-  let transferEvents = fetchTransferEvents(event); // Adjust this based on how you access transfer events
+  // Fetch transfer events related to the current sale event
+  // Note: Cast `event` to `ethereum.Event` to use with `fetchTransferEvents`
+  let transferEvents = fetchTransferEvents(event as unknown as ethereum.Event);
 
-  // Process each transfer event to retrieve token IDs
+  // Iterate through each transfer event to retrieve token IDs
   for (let i = 0; i < transferEvents.length; i++) {
     let transferEvent = transferEvents[i];
+    let tokenIdFromTransfer = transferEvent.tokenId.toString(); // Convert token ID to string
 
-    // Retrieve the token ID from the TransferEvent
-    let tokenIdFromTransfer = getTokenId(event, seller);
-
-    // If a token ID is found, add it to the array of token IDs
     if (tokenIdFromTransfer) {
-      tokenIds.push(tokenIdFromTransfer);
+      tokenIds.push(tokenIdFromTransfer); // Add token ID to the list
     }
   }
 
   // Process each token ID involved in the transaction
   for (let i = 0; i < tokenIds.length; i++) {
     let tokenId = tokenIds[i]; // Token ID in string format
+    let covenToken = getOrCreateCovenToken(event, tokenId); // Ensure a CovenToken entity exists
 
-    // Ensure that a CovenToken entity exists for this token ID
-    let covenToken = getOrCreateCovenToken(event, tokenId);
-
-    // If the CovenToken entity exists, update its ownership to the buyer
     if (covenToken) {
-      covenToken.owner = buyer; // Set the new owner of the token
+      covenToken.owner = buyer; // Update the token's owner to the buyer
       covenToken.save(); // Save the updated CovenToken entity
     }
-    // Update transaction details
+
+    // Update transaction details with sale information
     transaction.totalNFTsSold = transaction.totalNFTsSold.plus(BIGINT_ONE); // Increment total NFTs sold
-    totalSaleVolume = totalSaleVolume.plus(salePrice); // Accumulate total sale volume
+    totalSaleVolume = totalSaleVolume.plus(salePrice); // Add sale price to total sale volume
 
     // Update highest and lowest sale prices
     if (salePrice.gt(highestSalePrice)) {
-      highestSalePrice = salePrice; // Update highest sale price
+      highestSalePrice = salePrice; // Set highest sale price
     }
     if (salePrice.lt(lowestSalePrice) || lowestSalePrice.equals(BIGINT_ZERO)) {
-      lowestSalePrice = salePrice; // Update lowest sale price
+      lowestSalePrice = salePrice; // Set lowest sale price
     }
   }
 
   // Calculate average sale price
-  transaction.totalSalesVolume = totalSaleVolume;
-  transaction.averageSalePrice = totalSaleVolume.div(transaction.totalNFTsSold);
-  transaction.highestSalePrice = highestSalePrice;
-  transaction.lowestSalePrice = lowestSalePrice;
+  transaction.totalSalesVolume = totalSaleVolume; // Set total sales volume
+  transaction.averageSalePrice = totalSaleVolume.div(transaction.totalNFTsSold); // Compute average sale price
+  transaction.highestSalePrice = highestSalePrice; // Set highest sale price
+  transaction.lowestSalePrice = lowestSalePrice; // Set lowest sale price
 
   // Save the updated Transaction entity
   transaction.save();
 
-  // Update the seller's and buyer's accounts with the trade details
+  // Update seller's and buyer's account details with trade information
   sellerAccount.totalAmountSold =
-    sellerAccount.totalAmountSold.plus(totalSaleVolume); // Increment totalAmountSold for seller
+    sellerAccount.totalAmountSold.plus(totalSaleVolume); // Increment total amount sold for seller
   buyerAccount.totalAmountBought =
-    buyerAccount.totalAmountBought.plus(totalSaleVolume); // Increment totalAmountBought for buyer
+    buyerAccount.totalAmountBought.plus(totalSaleVolume); // Increment total amount bought for buyer
   sellerAccount.activityCount = sellerAccount.activityCount.plus(
     transaction.totalNFTsSold
   ); // Increment activity count for seller
@@ -168,6 +160,6 @@ export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
   buyerAccount.save();
 
   // Analyze historical data for the seller and buyer accounts
-  analyzeHistoricalData(sellerAccount.id);
-  analyzeHistoricalData(buyerAccount.id);
+  analyzeHistoricalData(sellerAccount.id); // Analyze seller's historical data
+  analyzeHistoricalData(buyerAccount.id); // Analyze buyer's historical data
 }
