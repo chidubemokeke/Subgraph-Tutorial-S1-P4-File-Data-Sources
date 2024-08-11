@@ -47,9 +47,8 @@ type CovenToken @entity {
   id: ID! # TxHash + logNumber #This ID/Entity is used for referencing events in the same transaction
   from: Account! # The address of the sender
   to: Account! # The address of the receiver
-  owner: String! # New owner of Coven NFT
+  owner: Bytes!
   tokenId: BigInt! # The ID of the token.
-  amount: BigInt # Amount of NFTS transferred
   referenceId: String! # Field for storing referenceIDs of other events in the same transaction.
   "Transaction details"
   blockNumber: BigInt!

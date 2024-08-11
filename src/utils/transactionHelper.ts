@@ -18,7 +18,7 @@ export function getOrCreateTransaction(
   type: TransactionType
 ): Transaction {
   // Generate a unique ID for the transaction based on the event and type
-  let transactionId = getGlobalId(event, type.toString());
+  let transactionId = getGlobalId(event);
 
   // Attempt to load the transaction entity using the generated ID
   let transaction = Transaction.load(transactionId);

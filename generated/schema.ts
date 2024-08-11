@@ -459,17 +459,17 @@ export class CovenToken extends Entity {
     this.set("to", Value.fromString(value));
   }
 
-  get owner(): string {
+  get owner(): Bytes {
     let value = this.get("owner");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
-      return value.toString();
+      return value.toBytes();
     }
   }
 
-  set owner(value: string) {
-    this.set("owner", Value.fromString(value));
+  set owner(value: Bytes) {
+    this.set("owner", Value.fromBytes(value));
   }
 
   get tokenId(): BigInt {
@@ -483,23 +483,6 @@ export class CovenToken extends Entity {
 
   set tokenId(value: BigInt) {
     this.set("tokenId", Value.fromBigInt(value));
-  }
-
-  get amount(): BigInt | null {
-    let value = this.get("amount");
-    if (!value || value.kind == ValueKind.NULL) {
-      return null;
-    } else {
-      return value.toBigInt();
-    }
-  }
-
-  set amount(value: BigInt | null) {
-    if (!value) {
-      this.unset("amount");
-    } else {
-      this.set("amount", Value.fromBigInt(<BigInt>value));
-    }
   }
 
   get referenceId(): string {
