@@ -1,10 +1,12 @@
 import { BigInt, ethereum, Address, Bytes } from "@graphprotocol/graph-ts";
-import { Account, CovenToken } from "../../generated/schema";
+import { Account, AccountHistory, CovenToken } from "../../generated/schema";
 import {
   BIGINT_ONE,
   BIGINT_ZERO,
   TRANSFER_EVENT_SIGNATURE_HASH,
 } from "./constant";
+import { Transfer } from "../../generated/CryptoCoven/CryptoCoven";
+import { getGlobalId } from "./helpers";
 
 // Enum for Transaction Types
 export enum TransactionType {
@@ -54,7 +56,7 @@ export function getOrCreateAccount(accountId: string): Account {
  * @param event The Ethereum event containing transaction logs.
  * @param accountId The ID of the account to analyze.
  */
-export function analyzeAccountHistory(
+/**export function analyzeAccountHistory(
   event: ethereum.Event,
   accountId: string
 ): void {
@@ -82,7 +84,7 @@ export function analyzeAccountHistory(
     // Check if the log entry corresponds to a Transfer event by comparing the event signature hash
     if (log.topics[0].toHexString() == TRANSFER_EVENT_SIGNATURE_HASH) {
       // Extract 'from' address (sender) from the first topic (index 1)
-      let from = Address.fromHexString(log.topics[1].toHexString());
+      let from = Bytes.fromHexString(log.topics[1].toHexString());
 
       // Extract 'to' address (receiver) from the second topic (index 2)
       let to = Address.fromHexString(log.topics[2].toHexString());
@@ -108,7 +110,6 @@ export function analyzeAccountHistory(
       transferEvent.from = from.toHex(); // Address from which tokens were sent
       transferEvent.to = to.toHex(); // Address to which tokens were received
       transferEvent.tokenId = tokenId; // ID of the token being transferred
-      transferEvent.amount = amountBigInt; // Amount of tokens transferred
       transferEvent.blockNumber = event.block.number; // Block number in which the transfer occurred
       transferEvent.blockHash = event.block.hash; // Block hash of the block in which the transfer occurred
       transferEvent.txHash = event.transaction.hash; // Transaction hash of the transfer
@@ -121,7 +122,7 @@ export function analyzeAccountHistory(
       if (from.toHex() == accountId) {
         // If the account is the sender, increment the sale count
         totalSaleCount = totalSaleCount.plus(amountBigInt);
-      } else if (to.toHex() == accountId) {
+      } else if (to.to == accountId) {
         // If the account is the receiver, increment the mint count
         totalMintCount = totalMintCount.plus(amountBigInt);
       }
@@ -168,9 +169,8 @@ export function analyzeAccountHistory(
   // Save the updated Account entity back to the subgraph's data store
   // This persists the changes made to the account entity, including the determined account types
   account.save();
-}
-
-/**export function analyzeHistoricalData(accountId: string): void {
+}**/
+export function analyzeHistoricalData(accountId: string): void {
   // Load the account entity by its ID from the subgraph's data store
   // If the account doesn't exist (i.e., it hasn't been created), the function exits early
   let account = Account.load(accountId);
@@ -187,28 +187,27 @@ export function analyzeAccountHistory(
 
   // This array is a placeholder for the events associated with the account's history
   // In a real scenario, this would contain the events you want to analyze
-  let events: ethereum.Event[] = []; // We assume the events are available or retrieved from somewhere
+  //let events: ethereum.Event[] = []; // We assume the events are available or retrieved from somewhere
 
- // Fetch MintEvents associated with this account
-  let mintEvents = Transfer.load(accountId);
+  // Fetch MintEvents associated with this account
+  let mintEvents = CovenToken.load(accountId);
   for (let i = 0; i < mintEvents.length; i++) {
     let mintEvent = mintEvents[i];
     totalMintCount = totalMintCount.plus(mintEvent.mintCount);
   }
-    // Generate a unique ID for this historical event related to the account
-    // This ID ensures that each history record is unique, preventing overlap or conflicts
-    let historyId = getGlobalId(event, accountId);
+  // Generate a unique ID for this historical event related to the account
+  // This ID ensures that each history record is unique, preventing overlap or conflicts
+  let historyId = getGlobalId(event);
 
-    // Load the corresponding AccountHistory entity using the unique history ID
-    // This will retrieve the historical record for this specific event if it exists
-    let history = AccountHistory.load(historyId);
+  // Load the corresponding AccountHistory entity using the unique history ID
+  // This will retrieve the historical record for this specific event if it exists
+  let history = AccountHistory.load(historyId);
 
-    // If a historical record exists, update the counters by adding the event counts
-    if (history) {
-      totalMintCount = totalMintCount.plus(history.mintCount); // Add the mint count from this history to the total
-      totalBuyCount = totalBuyCount.plus(history.buyCount); // Add the buy count from this history to the total
-      totalSaleCount = totalSaleCount.plus(history.saleCount); // Add the sale count from this history to the total
-    }
+  // If a historical record exists, update the counters by adding the event counts
+  if (history) {
+    totalMintCount = totalMintCount.plus(history.mintCount); // Add the mint count from this history to the total
+    totalBuyCount = totalBuyCount.plus(history.buyCount); // Add the buy count from this history to the total
+    totalSaleCount = totalSaleCount.plus(history.saleCount); // Add the sale count from this history to the total
   }
 
   // Now that we have the total counts, we determine the account type
@@ -247,4 +246,4 @@ export function analyzeAccountHistory(
   // Finally, save the updated account entity back to the subgraph's data store
   // This persists the changes we made, including the determined account types
   account.save();
-}**/
+}
