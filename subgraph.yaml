@@ -49,7 +49,7 @@ dataSources:
       eventHandlers:
         - event: OrdersMatched(bytes32,bytes32,indexed address,indexed address,uint256,indexed bytes32)
           handler: handleOpenSeaSale
-          receipt: true # Enable transaction receipt for this event to fetch the CryptoCoven tokenId from the transaction logIndex
+          receipt: true # Enable transaction receipt for this event to fetch the CryptoCoven tokenId from the transaction logIndex as it's not in the ordersMatched event
       file: src/mappings/transactions.ts
 #templates:
 #- kind: file/ipfs

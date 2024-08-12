@@ -1,45 +1,27 @@
 import { BigInt, Address, Bytes, ethereum } from "@graphprotocol/graph-ts";
-import { CovenToken } from "../../generated/schema";
+import { Account, AccountHistory, CovenToken } from "../../generated/schema";
 import { BIGINT_ONE, TRANSFER_EVENT_SIGNATURE_HASH } from "./constant";
 
-// Helper function to generate a unique ID for tracking log indices and account-specific history
-export function getGlobalId(event: ethereum.Event): string {
-  // Get the transaction hash as a hexadecimal string
-  let globalId = event.transaction.hash
-    .toHexString()
-    // Concatenate a hyphen to the hexadecimal string
-    .concat("-")
-    // Concatenate the log index of the event to the resulting string
-    .concat(event.logIndex.toString());
-  return globalId; // Return the generated globalId
-}
-
-// This function creates or loads the CovenToken entity on demand.
-// We need it to carry values over to events where those values don't exist (ordersMatched on OpenSea).
-export function getOrCreateCovenToken(event: ethereum.Event): CovenToken {
-  let tokenId = event.parameters.tokenId.toString();
-
-  let token = CovenToken.load(tokenId); // Load the CovenToken entity if it exist
-
-  // If the CovenToken entity does not exist, create a new one
+// Helper function to update or create a CovenToken entity
+export function updateTokenOwnership(
+  tokenId: BigInt,
+  ownerAddress: Bytes
+): void {
+  // Load the token entity or create a new one if it doesn't exist
+  // This is necessary to update or initialize the ownership of a token.
+  let token = CovenToken.load(tokenId.toString());
   if (!token) {
-    token = new CovenToken(tokenId); // Create a new CovenToken entity with the ID
-    token.from = token.from;
-    covenToken.timestamp = event.block.timestamp; // Set the timestamp to the event block timestamp
-    covenToken.blockHash = event.block.hash;
-    covenToken.txHash = event.transaction.hash;
-    covenToken.blockNumber = event.block.number;
-    covenToken.save(); // Save the new CovenToken entity
+    token = new CovenToken(tokenId.toString());
   }
-
-  return covenToken; // Return the CovenToken entity
+  token.owner = ownerAddress; // Set the new owner of the token
+  token.save(); // Save the token entity to the store
 }
 
 // Helper function to get tokenId from TransferEvent
 // We need the tokenID to validate the sale in OrderMatched() event in OpenSea's Contract
 // TokenId should exist with the given ID in the same transaction at the time it's being called in OrderMatched() event.
 // The transfer always comes first, so we need to provide the correct logIndex
-export function getTokenId(event: ethereum.Event): string | null {
+/**export function getTokenId(event: ethereum.Event): string | null {
   // Calculate the previous log index (since TransferEvent comes first)
   let covenLogIndex = event.logIndex.minus(BIGINT_ONE);
 

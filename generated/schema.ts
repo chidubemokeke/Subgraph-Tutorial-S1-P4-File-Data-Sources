@@ -677,6 +677,19 @@ export class Transaction extends Entity {
     this.set("account", Value.fromString(value));
   }
 
+  get referenceId(): string {
+    let value = this.get("referenceId");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toString();
+    }
+  }
+
+  set referenceId(value: string) {
+    this.set("referenceId", Value.fromString(value));
+  }
+
   get transactionType(): string {
     let value = this.get("transactionType");
     if (!value || value.kind == ValueKind.NULL) {
