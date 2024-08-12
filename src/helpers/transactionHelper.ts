@@ -1,7 +1,7 @@
 import { ethereum } from "@graphprotocol/graph-ts";
 import { Transaction } from "../../generated/schema";
 import { BIGINT_ZERO } from "./constant";
-import { getGlobalId } from "./helpers";
+import { getGlobalId } from "./utils";
 
 // Define an enumeration for transaction types: TRADE and MINT
 // Enum for Transaction Types
@@ -13,7 +13,7 @@ export enum TransactionType {
 // This function creates or loads the Transaction entity on demand.
 // It ensures that we accurately track each transaction associated with an account.
 // Function to create or load a Transaction entity
-export function getOrCreateTransaction(
+export function createTransaction(
   event: ethereum.Event,
   type: TransactionType
 ): Transaction {

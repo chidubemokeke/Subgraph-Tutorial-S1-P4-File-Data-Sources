@@ -3,15 +3,15 @@ import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCov
 import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
 import {
   getOrCreateAccount,
-  analyzeAccountHistory,
-} from "../utils/accountHelper";
+  analyzeHistoricalData,
+} from "../helpers/accountHelper";
 import {
   getTokenId,
   getOrCreateCovenToken,
   getGlobalId,
-} from "../utils/helpers";
-import { getOrCreateTransaction } from "../utils/transactionHelper";
-import { ZERO_ADDRESS, BIGINT_ZERO, BIGINT_ONE } from "../utils/constant";
+} from "../helpers/utils";
+import { getOrCreateTransaction } from "../helpers/transactionHelper";
+import { ZERO_ADDRESS, BIGINT_ZERO, BIGINT_ONE } from "../helpers/constant";
 
 // Enum for Transaction Types
 // Enum is a special "class" that represents a group of constants (unchangeable variables).

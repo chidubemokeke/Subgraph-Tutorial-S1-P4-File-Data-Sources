@@ -6,21 +6,15 @@ import {
   TRANSFER_EVENT_SIGNATURE_HASH,
 } from "./constant";
 import { Transfer } from "../../generated/CryptoCoven/CryptoCoven";
-import { getGlobalId } from "./helpers";
+import { getGlobalId } from "./utils";
 
-// Enum for Transaction Types
-export enum TransactionType {
-  TRADE = 0,
-  MINT = 1,
-}
-
-export function getOrCreateAccount(accountId: string): Account {
-  // Attempt to load the account entity by its address
-  let account = Account.load(accountId);
+export function getOrCreateAccount(address: Address): Account {
+  let id = address as Bytes;
+  let account = Account.load(id.toHex());
 
   if (!account) {
     // Create a new account entity if it does not exist
-    account = new Account(accountId);
+    account = new Account(id.toHex());
     account.activityCount = BIGINT_ZERO;
     account.mintCount = BIGINT_ZERO; // Initialize mint count
     account.buyCount = BIGINT_ZERO; // Initialize mint count
@@ -30,6 +24,8 @@ export function getOrCreateAccount(accountId: string): Account {
     account.totalAmountBalance = BIGINT_ZERO; // Initialize total balance
     account.blockNumber = BIGINT_ZERO; // Initialize block number
     account.blockTimestamp = BIGINT_ZERO; // Initialize block timestamp
+    account.logIndex = BIGINT_ZERO;
+    account.txHash = Bytes.empty();
     account.isOG = false; // Default to not being a collector
     account.isCollector = false; // Default to not being a collector
     account.isHunter = false; // Default to not being a hunter
@@ -44,6 +40,7 @@ export function getOrCreateAccount(accountId: string): Account {
     account.totalAmountBought = account.totalAmountBought || BIGINT_ZERO;
     account.totalAmountSold = account.totalAmountSold || BIGINT_ZERO;
     account.totalAmountBalance || BIGINT_ZERO;
+    account.logIndex || BIGINT_ZERO;
     account.blockNumber = account.blockNumber || BIGINT_ZERO;
     account.blockTimestamp = account.blockTimestamp || BIGINT_ZERO;
   }

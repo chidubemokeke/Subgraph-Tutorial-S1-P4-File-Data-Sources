@@ -17,12 +17,14 @@ export function getGlobalId(event: ethereum.Event): string {
 // This function creates or loads the CovenToken entity on demand.
 // We need it to carry values over to events where those values don't exist (ordersMatched on OpenSea).
 export function getOrCreateCovenToken(event: ethereum.Event): CovenToken {
-  let covenToken = CovenToken.load(getGlobalId(event)); // Load the CovenToken entity if it exist
+  let tokenId = event.parameters.tokenId.toString();
+
+  let token = CovenToken.load(tokenId); // Load the CovenToken entity if it exist
 
   // If the CovenToken entity does not exist, create a new one
-  if (!covenToken) {
-    covenToken = new CovenToken(getGlobalId(event)); // Create a new CovenToken entity with the ID
-    covenToken.referenceId = covenToken.id;
+  if (!token) {
+    token = new CovenToken(tokenId); // Create a new CovenToken entity with the ID
+    token.from = token.from;
     covenToken.timestamp = event.block.timestamp; // Set the timestamp to the event block timestamp
     covenToken.blockHash = event.block.hash;
     covenToken.txHash = event.transaction.hash;

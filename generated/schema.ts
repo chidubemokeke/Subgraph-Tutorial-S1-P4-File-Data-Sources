@@ -75,43 +75,55 @@ export class Account extends Entity {
     this.set("activityCount", Value.fromBigInt(value));
   }
 
-  get mintCount(): BigInt {
+  get mintCount(): BigInt | null {
     let value = this.get("mintCount");
     if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
+      return null;
     } else {
       return value.toBigInt();
     }
   }
 
-  set mintCount(value: BigInt) {
-    this.set("mintCount", Value.fromBigInt(value));
+  set mintCount(value: BigInt | null) {
+    if (!value) {
+      this.unset("mintCount");
+    } else {
+      this.set("mintCount", Value.fromBigInt(<BigInt>value));
+    }
   }
 
-  get buyCount(): BigInt {
+  get buyCount(): BigInt | null {
     let value = this.get("buyCount");
     if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
+      return null;
     } else {
       return value.toBigInt();
     }
   }
 
-  set buyCount(value: BigInt) {
-    this.set("buyCount", Value.fromBigInt(value));
+  set buyCount(value: BigInt | null) {
+    if (!value) {
+      this.unset("buyCount");
+    } else {
+      this.set("buyCount", Value.fromBigInt(<BigInt>value));
+    }
   }
 
-  get saleCount(): BigInt {
+  get saleCount(): BigInt | null {
     let value = this.get("saleCount");
     if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
+      return null;
     } else {
       return value.toBigInt();
     }
   }
 
-  set saleCount(value: BigInt) {
-    this.set("saleCount", Value.fromBigInt(value));
+  set saleCount(value: BigInt | null) {
+    if (!value) {
+      this.unset("saleCount");
+    } else {
+      this.set("saleCount", Value.fromBigInt(<BigInt>value));
+    }
   }
 
   get isOG(): boolean {
@@ -218,6 +230,48 @@ export class Account extends Entity {
     this.set("totalAmountBalance", Value.fromBigInt(value));
   }
 
+  get transactions(): TransactionLoader {
+    return new TransactionLoader(
+      "Account",
+      this.get("id")!.toString(),
+      "transactions",
+    );
+  }
+
+  get history(): AccountHistoryLoader {
+    return new AccountHistoryLoader(
+      "Account",
+      this.get("id")!.toString(),
+      "history",
+    );
+  }
+
+  get logIndex(): BigInt {
+    let value = this.get("logIndex");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set logIndex(value: BigInt) {
+    this.set("logIndex", Value.fromBigInt(value));
+  }
+
+  get txHash(): Bytes {
+    let value = this.get("txHash");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBytes();
+    }
+  }
+
+  set txHash(value: Bytes) {
+    this.set("txHash", Value.fromBytes(value));
+  }
+
   get blockNumber(): BigInt {
     let value = this.get("blockNumber");
     if (!value || value.kind == ValueKind.NULL) {
@@ -242,22 +296,6 @@ export class Account extends Entity {
 
   set blockTimestamp(value: BigInt) {
     this.set("blockTimestamp", Value.fromBigInt(value));
-  }
-
-  get transactions(): TransactionLoader {
-    return new TransactionLoader(
-      "Account",
-      this.get("id")!.toString(),
-      "transactions",
-    );
-  }
-
-  get history(): AccountHistoryLoader {
-    return new AccountHistoryLoader(
-      "Account",
-      this.get("id")!.toString(),
-      "history",
-    );
   }
 }
 
@@ -302,8 +340,8 @@ export class AccountHistory extends Entity {
     this.set("id", Value.fromString(value));
   }
 
-  get account(): string {
-    let value = this.get("account");
+  get history(): string {
+    let value = this.get("history");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
@@ -311,21 +349,21 @@ export class AccountHistory extends Entity {
     }
   }
 
-  set account(value: string) {
-    this.set("account", Value.fromString(value));
+  set history(value: string) {
+    this.set("history", Value.fromString(value));
   }
 
-  get timestamp(): BigInt {
-    let value = this.get("timestamp");
+  get owner(): Bytes {
+    let value = this.get("owner");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
-      return value.toBigInt();
+      return value.toBytes();
     }
   }
 
-  set timestamp(value: BigInt) {
-    this.set("timestamp", Value.fromBigInt(value));
+  set owner(value: Bytes) {
+    this.set("owner", Value.fromBytes(value));
   }
 
   get mintCount(): BigInt {
@@ -365,6 +403,32 @@ export class AccountHistory extends Entity {
 
   set saleCount(value: BigInt) {
     this.set("saleCount", Value.fromBigInt(value));
+  }
+
+  get logIndex(): BigInt {
+    let value = this.get("logIndex");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set logIndex(value: BigInt) {
+    this.set("logIndex", Value.fromBigInt(value));
+  }
+
+  get txHash(): Bytes {
+    let value = this.get("txHash");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBytes();
+    }
+  }
+
+  set txHash(value: Bytes) {
+    this.set("txHash", Value.fromBytes(value));
   }
 
   get blockNumber(): BigInt {
@@ -472,34 +536,42 @@ export class CovenToken extends Entity {
     this.set("owner", Value.fromBytes(value));
   }
 
-  get tokenId(): BigInt {
+  get tokenId(): string | null {
     let value = this.get("tokenId");
     if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
-    } else {
-      return value.toBigInt();
-    }
-  }
-
-  set tokenId(value: BigInt) {
-    this.set("tokenId", Value.fromBigInt(value));
-  }
-
-  get referenceId(): string {
-    let value = this.get("referenceId");
-    if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
+      return null;
     } else {
       return value.toString();
     }
   }
 
-  set referenceId(value: string) {
-    this.set("referenceId", Value.fromString(value));
+  set tokenId(value: string | null) {
+    if (!value) {
+      this.unset("tokenId");
+    } else {
+      this.set("tokenId", Value.fromString(<string>value));
+    }
   }
 
-  get blockNumber(): BigInt {
-    let value = this.get("blockNumber");
+  get referenceId(): string | null {
+    let value = this.get("referenceId");
+    if (!value || value.kind == ValueKind.NULL) {
+      return null;
+    } else {
+      return value.toString();
+    }
+  }
+
+  set referenceId(value: string | null) {
+    if (!value) {
+      this.unset("referenceId");
+    } else {
+      this.set("referenceId", Value.fromString(<string>value));
+    }
+  }
+
+  get logIndex(): BigInt {
+    let value = this.get("logIndex");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
@@ -507,21 +579,8 @@ export class CovenToken extends Entity {
     }
   }
 
-  set blockNumber(value: BigInt) {
-    this.set("blockNumber", Value.fromBigInt(value));
-  }
-
-  get blockHash(): Bytes {
-    let value = this.get("blockHash");
-    if (!value || value.kind == ValueKind.NULL) {
-      throw new Error("Cannot return null for a required field.");
-    } else {
-      return value.toBytes();
-    }
-  }
-
-  set blockHash(value: Bytes) {
-    this.set("blockHash", Value.fromBytes(value));
+  set logIndex(value: BigInt) {
+    this.set("logIndex", Value.fromBigInt(value));
   }
 
   get txHash(): Bytes {
@@ -537,8 +596,8 @@ export class CovenToken extends Entity {
     this.set("txHash", Value.fromBytes(value));
   }
 
-  get timestamp(): BigInt {
-    let value = this.get("timestamp");
+  get blockNumber(): BigInt {
+    let value = this.get("blockNumber");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
@@ -546,8 +605,21 @@ export class CovenToken extends Entity {
     }
   }
 
-  set timestamp(value: BigInt) {
-    this.set("timestamp", Value.fromBigInt(value));
+  set blockNumber(value: BigInt) {
+    this.set("blockNumber", Value.fromBigInt(value));
+  }
+
+  get blockTimestamp(): BigInt {
+    let value = this.get("blockTimestamp");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set blockTimestamp(value: BigInt) {
+    this.set("blockTimestamp", Value.fromBigInt(value));
   }
 }
 
@@ -618,55 +690,43 @@ export class Transaction extends Entity {
     this.set("transactionType", Value.fromString(value));
   }
 
-  get buyer(): Bytes | null {
+  get buyer(): Bytes {
     let value = this.get("buyer");
     if (!value || value.kind == ValueKind.NULL) {
-      return null;
+      throw new Error("Cannot return null for a required field.");
     } else {
       return value.toBytes();
     }
   }
 
-  set buyer(value: Bytes | null) {
-    if (!value) {
-      this.unset("buyer");
-    } else {
-      this.set("buyer", Value.fromBytes(<Bytes>value));
-    }
+  set buyer(value: Bytes) {
+    this.set("buyer", Value.fromBytes(value));
   }
 
-  get seller(): Bytes | null {
+  get seller(): Bytes {
     let value = this.get("seller");
     if (!value || value.kind == ValueKind.NULL) {
-      return null;
+      throw new Error("Cannot return null for a required field.");
     } else {
       return value.toBytes();
     }
   }
 
-  set seller(value: Bytes | null) {
-    if (!value) {
-      this.unset("seller");
-    } else {
-      this.set("seller", Value.fromBytes(<Bytes>value));
-    }
+  set seller(value: Bytes) {
+    this.set("seller", Value.fromBytes(value));
   }
 
-  get nftSalePrice(): BigInt | null {
+  get nftSalePrice(): BigInt {
     let value = this.get("nftSalePrice");
     if (!value || value.kind == ValueKind.NULL) {
-      return null;
+      throw new Error("Cannot return null for a required field.");
     } else {
       return value.toBigInt();
     }
   }
 
-  set nftSalePrice(value: BigInt | null) {
-    if (!value) {
-      this.unset("nftSalePrice");
-    } else {
-      this.set("nftSalePrice", Value.fromBigInt(<BigInt>value));
-    }
+  set nftSalePrice(value: BigInt) {
+    this.set("nftSalePrice", Value.fromBigInt(value));
   }
 
   get totalNFTsSold(): BigInt {
@@ -784,6 +844,58 @@ export class Transaction extends Entity {
 
   set lowestSalePrice(value: BigInt) {
     this.set("lowestSalePrice", Value.fromBigInt(value));
+  }
+
+  get logIndex(): BigInt {
+    let value = this.get("logIndex");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set logIndex(value: BigInt) {
+    this.set("logIndex", Value.fromBigInt(value));
+  }
+
+  get txHash(): Bytes {
+    let value = this.get("txHash");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBytes();
+    }
+  }
+
+  set txHash(value: Bytes) {
+    this.set("txHash", Value.fromBytes(value));
+  }
+
+  get blockNumber(): BigInt {
+    let value = this.get("blockNumber");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set blockNumber(value: BigInt) {
+    this.set("blockNumber", Value.fromBigInt(value));
+  }
+
+  get blockTimestamp(): BigInt {
+    let value = this.get("blockTimestamp");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toBigInt();
+    }
+  }
+
+  set blockTimestamp(value: BigInt) {
+    this.set("blockTimestamp", Value.fromBigInt(value));
   }
 }
 
