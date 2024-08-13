@@ -1,38 +1,63 @@
+# The version of the Subgraph manifest schema
 specVersion: 1.0.0
+
+# Indexer hints provide recommendations for how data should be handled
 indexerHints:
+  # Automatically prune historical data to optimize storage and performance
   prune: auto
+
+# The schema file defines the GraphQL schema used for the subgraph
 schema:
+  # Path to the GraphQL schema file
   file: ./schema.graphql
+
+# Data sources define the Ethereum contracts that the subgraph will index
 dataSources:
   - kind: ethereum
     name: CryptoCoven
     network: mainnet
     source:
+      # Address of the CryptoCoven contract on the Ethereum mainnet
       address: "0x5180db8F5c931aaE63c74266b211F580155ecac8"
+      # ABI (Application Binary Interface) file used to interact with the contract
       abi: CryptoCoven
+      # The block from which to start indexing events
       startBlock: 13547115
     mapping:
+      # Type of mapping (events or call handlers)
       kind: ethereum/events
+      # API version of the Graph Protocol
       apiVersion: 0.0.7
+      # Programming language used for the mapping
       language: wasm/assemblyscript
+      # List of entities defined in the schema that this mapping will use
       entities:
         - Account
         - AccountHistory
         - CovenToken
         - Transaction
+      # ABIs used in the mapping
       abis:
         - name: CryptoCoven
+          # Path to the ABI file for the CryptoCoven contract
           file: ./abis/CryptoCoven.json
+      # Event handlers define which events to listen for and which functions to call when those events are emitted
       eventHandlers:
         - event: Transfer(indexed address,indexed address,indexed uint256)
+          # Function to handle the Transfer event
           handler: handleTransfer
+      # Path to the TypeScript file that contains the event handler implementations
       file: src/mappings/transactions.ts
+
   - kind: ethereum/contract
     name: Opensea
     network: mainnet
     source:
+      # Address of the OpenSea contract on the Ethereum mainnet
       address: "0x7be8076f4ea4a4ad08075c2508e481d6c946d12b"
+      # The block from which to start indexing events
       startBlock: 13547115
+      # ABI file for the OpenSea contract
       abi: Opensea
     mapping:
       kind: ethereum/events
@@ -45,21 +70,13 @@ dataSources:
         - Transaction
       abis:
         - name: Opensea
+          # Path to the ABI file for the OpenSea contract
           file: ./abis/Opensea.json
       eventHandlers:
         - event: OrdersMatched(bytes32,bytes32,indexed address,indexed address,uint256,indexed bytes32)
+          # Function to handle the OrdersMatched event
           handler: handleOpenSeaSale
-          receipt: true # Enable transaction receipt for this event to fetch the CryptoCoven tokenId from the transaction logIndex as it's not in the ordersMatched event
+          # Enable receipt processing to access additional data from the transaction logs
+          receipt: true
+      # Path to the TypeScript file that contains the event handler implementations
       file: src/mappings/transactions.ts
-#templates:
-#- kind: file/ipfs
-# name: NFTMetadata
-#mapping:
-# apiVersion: 0.0.7
-#language: wasm/assemblyscript
-#file: ./src/crypto-coven.ts
-#entities:
-# - NFTMetadata
-# abis:
-#- name: CryptoCoven
-#  file: ./abis/CryptoCoven.json

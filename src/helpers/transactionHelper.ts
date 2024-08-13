@@ -13,10 +13,7 @@ export enum TransactionType {
 // This function creates or loads the Transaction entity on demand.
 // It ensures that we accurately track each transaction associated with an account.
 // Function to create or load a Transaction entity
-export function createTransaction(
-  event: ethereum.Event,
-  type: TransactionType
-): Transaction {
+export function createTransaction(event: ethereum.Event): Transaction {
   // Generate a unique ID for the transaction based on the event and type
   let transactionId = getGlobalId(event);
 

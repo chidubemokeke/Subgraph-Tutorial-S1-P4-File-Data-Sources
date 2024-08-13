@@ -81,10 +81,10 @@ type CovenToken @entity {
   owner: Bytes!
 
   "The ID of the token"
-  tokenId: String
+  tokenId: BigInt!
 
-  "Field for storing referenceIDs of other events in the same transaction"
-  referenceId: String
+  "Total number of times NFT has been minted"
+  tokenMintCount: BigInt!
 
   "Transaction details"
   logIndex: BigInt! # Index of the log within the transaction
