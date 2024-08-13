@@ -76,7 +76,7 @@ dataSources:
         - event: OrdersMatched(bytes32,bytes32,indexed address,indexed address,uint256,indexed bytes32)
           # Function to handle the OrdersMatched event
           handler: handleOpenSeaSale
-          # Enable receipt processing to access additional data from the transaction logs
+          # Enable receipt processing to access additional data from the transaction logs to fetch the tokenId from the logs
           receipt: true
       # Path to the TypeScript file that contains the event handler implementations
       file: src/mappings/transactions.ts
