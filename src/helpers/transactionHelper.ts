@@ -1,38 +1,86 @@
 import { ethereum } from "@graphprotocol/graph-ts";
-import { Transaction } from "../../generated/schema";
+import { Account, AccountHistory, Transaction } from "../../generated/schema";
 import { BIGINT_ZERO } from "./constant";
-import { getGlobalId } from "./utils";
+import { getGlobalId, getTransactionType } from "./utils";
 
-// Define an enumeration for transaction types: TRADE and MINT
-// Enum for Transaction Types
-export enum TransactionType {
-  TRADE = 0,
-  MINT = 1,
+/**
+ * Initializes a new Transaction entity based on the provided event, account, and transaction type.
+ * This function sets up basic transaction details, including the transaction type, account association,
+ * and relevant blockchain event details. Counters related to bids, whitelisting, and NFT sales are initialized
+ * with default values.
+ *
+ * @param event - The Ethereum event that triggered the transaction.
+ * @param account - The Account entity associated with the transaction.
+ * @param transactionType - The type of transaction ("TRADE", "MINT", "TRANSFER").
+ * @returns The initialized Transaction entity.
+ */
+export function initializeTransaction(
+  event: ethereum.Event,
+  transactionType: string
+): Transaction {
+  // Generate a unique ID for the transaction using the transaction hash and log index.
+  // This ensures that each transaction has a distinct identifier.
+  let transaction = new Transaction(getGlobalId(event));
+
+  // Associate the transaction with the account entity by setting the account ID.
+  transaction.account = account.id;
+
+  // Set the type of transaction, such as "TRADE", "MINT", or "TRANSFER".
+  // The function getTransactionType ensures the transaction type is valid.
+  transaction.transactionType = getTransactionType(transactionType);
+
+  // Initialize counters and flags for additional transaction-related metrics.
+  // These are initialized to zero or false, providing a default starting state.
+  transaction.nftSalePrice = BIGINT_ZERO;
+  transaction.totalNFTsSold = BIGINT_ZERO;
+  transaction.totalSalesVolume = BIGINT_ZERO; // Default NFT sale price set to zero.
+  transaction.averageSalePrice = BIGINT_ZERO; // Default total NFTs sold set to zero.
+  transaction.totalSalesCount = BIGINT_ZERO;
+  transaction.highestSalePrice = BIGINT_ZERO;
+  transaction.lowestSalePrice = BIGINT_ZERO;
+
+  // Record the event details, such as log index, transaction hash, block number, and timestamp.
+  // This information is crucial for tracking when and where the transaction occurred on the blockchain.
+  transaction.logIndex = event.logIndex;
+  transaction.txHash = event.transaction.hash;
+  transaction.blockNumber = event.block.number;
+  transaction.blockTimestamp = event.block.timestamp;
+
+  // Return the fully initialized Transaction entity.
+  // This entity is now ready to be saved and associated with other relevant data.
+  return transaction;
 }
 
-// This function creates or loads the Transaction entity on demand.
-// It ensures that we accurately track each transaction associated with an account.
-// Function to create or load a Transaction entity
-export function createTransaction(event: ethereum.Event): Transaction {
-  // Generate a unique ID for the transaction based on the event and type
-  let transactionId = getGlobalId(event);
+/**
+ * Records the transaction history for a given account by creating a new AccountHistory entity.
+ * This entity captures the state of the account at the time of the event, including transaction counts
+ * and the details of the event (log index, transaction hash, block number, and timestamp).
+ *
+ * @param account - The Account entity whose history is being recorded.
+ * @param event - The Ethereum event that triggered the transaction.
+ */
+export function recordTransactionHistory(
+  account: Account,
+  event: ethereum.Event
+): void {
+  // Generate a unique ID for the history entry using the transaction hash and log index.
+  let history = new AccountHistory(getGlobalId(event));
 
-  // Attempt to load the transaction entity using the generated ID
-  let transaction = Transaction.load(transactionId);
+  // Associate the history entry with the account.
+  history.history = account.id;
 
-  if (!transaction) {
-    // If the transaction does not exist, create a new one
-    transaction = new Transaction(transactionId);
-    transaction.transactionType = type.toString(); // Convert enum to string // Set the type of transaction (e.g., "TRADE", "MINT")
-    transaction.totalNFTsSold = BIGINT_ZERO; // Initialize total NFTs sold
-    transaction.totalSalesVolume = BIGINT_ZERO; // Initialize total sales volume
-    transaction.averageSalePrice = BIGINT_ZERO; // Initialize average sale price
-    transaction.highestSalePrice = BIGINT_ZERO; // Initialize highest sale price
-    transaction.lowestSalePrice = BIGINT_ZERO; // Initialize lowest sale price
-    transaction.blockNumber = event.block.number; // Record block number
-    transaction.blockTimestamp = event.block.timestamp; // Record block timestamp
-  }
+  // Record the transaction sender (owner) and account transaction counts.
+  history.owner = event.transaction.from;
+  history.mintCount = account.mintCount;
+  history.buyCount = account.buyCount;
+  history.saleCount = account.saleCount;
 
-  // Return the loaded or newly created transaction entity
-  return transaction;
+  // Record the details of the Ethereum event (log index, transaction hash, block number, and timestamp).
+  history.logIndex = event.logIndex;
+  history.txHash = event.transaction.hash;
+  history.blockNumber = event.block.number;
+  history.blockTimestamp = event.block.timestamp;
+
+  // Save the AccountHistory entity to the store.
+  history.save();
 }
