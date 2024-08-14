@@ -5,6 +5,7 @@
 enum TransactionType {
   TRADE # Represents a sale transaction where an NFT is sold
   MINT # Represents a mint transaction where a new NFT is created
+  Transfer # Represents when an NFT is transferred without being sold on OpenSea
 }
 
 # Definition of the Account entity
@@ -19,10 +20,10 @@ type Account @entity {
   received: [CovenToken!]! @derivedFrom(field: "to")
 
   "Transaction count for account, Mint/Sale/buy/activity"
-  activityCount: BigInt!
-  mintCount: BigInt
-  buyCount: BigInt
-  saleCount: BigInt
+  transactionCount: BigInt!
+  mintCount: BigInt!
+  buyCount: BigInt!
+  saleCount: BigInt!
 
   "True if the account has only minted at least one Token and holds"
   isOG: Boolean
@@ -111,10 +112,7 @@ type Transaction @entity {
   "NFT sale transaction details"
   nftSalePrice: BigInt! # The amount of the NFT Tokens sold (relevant for sales).
   totalNFTsSold: BigInt! # The total number of NFTs sold in this transaction (relevant for sales).
-  blockNumber: BigInt! # The block number when this transaction was recorded. Helps in tracking historical data.
-  blockTimestamp: BigInt! # The timestamp of the block when this transaction was recorded. Provides a time reference.
   "Aggregated data fields"
-  transactionCount: BigInt! # Total number of transactions on OpenSea
   totalSalesVolume: BigInt! # Aggregates the total amount sold across all transactions
   averageSalePrice: BigInt! # Calculates the average price of NFTs sold.
   totalSalesCount: BigInt! # Tracks the total number of NFT sales.
@@ -124,5 +122,5 @@ type Transaction @entity {
   logIndex: BigInt! # Index of the log within the transaction
   txHash: Bytes!
   blockNumber: BigInt! # The block number when this entity was last updated. Helps in tracking historical changes.
-  blockTimestamp: BigInt!
+  blockTimestamp: BigInt! # The timestamp of the block when this transaction was recorded. Provides a time reference.
 }
