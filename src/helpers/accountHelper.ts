@@ -2,6 +2,12 @@ import { BigInt, Bytes } from "@graphprotocol/graph-ts";
 import { Account } from "../../generated/schema";
 import { BIGINT_ONE, BIGINT_ZERO } from "./constant";
 
+// Define the enum with the three transaction types
+export enum TransactionType {
+  TRADE, // Represents a sale transaction where an NFT is sold
+  MINT, // Represents a mint transaction where a new NFT is created
+  TRANSFER, // Represents when an NFT is transferred without being sold on OpenSea
+}
 /**
  * Creates a new Account entity or updates an existing one with default values if necessary.
  * This function ensures that all accounts involved in transactions are properly initialized
@@ -48,42 +54,41 @@ export function createOrUpdateAccount(address: Bytes): Account {
  * and adjusts the total amounts bought and sold, as well as the balance.
  *
  * @param account - The Account entity to update.
- * @param transactionType - The type of transaction ("TRADE", "MINT", "TRANSFER").
+ * @param transactionType - The type of transaction (TRADE, MINT, TRANSFER).
  * @param amount - The amount involved in the transaction.
  * @param isSale - Indicates whether the transaction is a sale (true) or a purchase (false).
  * @returns The updated Account entity.
  */
 export function updateAccountHistory(
   account: Account,
-  transactionType: string,
-  amount: BigInt,
+  transactionType: TransactionType,
+  price: BigInt,
   isSale: boolean = false
 ): Account {
   // Increment the overall transaction count for the account.
   account.transactionCount = account.transactionCount.plus(BIGINT_ONE);
 
   // Update specific counters and amounts based on the transaction type.
-  if (transactionType == "MINT") {
+  if (transactionType === TransactionType.MINT) {
     // If the transaction is a mint, increment the mint count.
     account.mintCount = account.mintCount.plus(account.mintCount);
-  } else if (transactionType == "TRADE" && isSale) {
+  } else if (transactionType === TransactionType.TRADE && isSale) {
     // If the transaction is a sale, increment the sale count and update the total amount sold.
     account.saleCount = account.saleCount.plus(BIGINT_ONE);
-    account.totalAmountSold = account.totalAmountSold.plus(amount);
+    account.totalAmountSold = account.totalAmountSold.plus(price);
     // Decrease the total balance by the amount sold.
-    account.totalAmountBalance = account.totalAmountBalance.minus(amount);
-  } else if (transactionType == "TRADE" && !isSale) {
+    account.totalAmountBalance = account.totalAmountBalance.minus(price);
+  } else if (transactionType === TransactionType.TRADE && !isSale) {
     // If the transaction is a purchase, increment the buy count and update the total amount bought.
     account.buyCount = account.buyCount.plus(BIGINT_ONE);
-    account.totalAmountBought = account.totalAmountBought.plus(amount);
+    account.totalAmountBought = account.totalAmountBought.plus(price);
     // Increase the total balance by the amount bought.
-    account.totalAmountBalance = account.totalAmountBalance.plus(amount);
+    account.totalAmountBalance = account.totalAmountBalance.plus(price);
   }
 
   // Return the updated account entity.
   return account;
 }
-
 /**
  * Determines the account type based on the account's transaction history.
  * The function sets boolean flags to categorize the account as an OG, Collector, Hunter, Farmer, or Trader.

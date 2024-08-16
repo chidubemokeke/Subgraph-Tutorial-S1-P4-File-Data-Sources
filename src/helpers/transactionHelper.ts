@@ -1,40 +1,37 @@
 import { ethereum } from "@graphprotocol/graph-ts";
 import { Account, AccountHistory, Transaction } from "../../generated/schema";
-import { BIGINT_ZERO } from "./constant";
-import { getGlobalId, getTransactionType } from "./utils";
+import {
+  BIGINT_ZERO,
+  BIGDECIMAL_ZERO,
+  ORDERS_MATCHED_SIG,
+  ZERO_ADDRESS,
+} from "./constant";
+import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
+import { getGlobalId } from "./utils";
+
+// Define the enum with the three transaction types
+export enum TransactionType {
+  TRADE, // Represents a sale transaction where an NFT is sold
+  MINT, // Represents a mint transaction where a new NFT is created
+  TRANSFER, // Represents when an NFT is transferred without being sold on OpenSea
+}
 
 /**
- * Initializes a new Transaction entity based on the provided event, account, and transaction type.
- * This function sets up basic transaction details, including the transaction type, account association,
- * and relevant blockchain event details. Counters related to bids, whitelisting, and NFT sales are initialized
- * with default values.
- *
+ * Initializes a new Transaction entity based on the provided event.
  * @param event - The Ethereum event that triggered the transaction.
- * @param account - The Account entity associated with the transaction.
- * @param transactionType - The type of transaction ("TRADE", "MINT", "TRANSFER").
  * @returns The initialized Transaction entity.
  */
-export function initializeTransaction(
-  event: ethereum.Event,
-  transactionType: string
-): Transaction {
+export function initializeTransaction(event: ethereum.Event): Transaction {
   // Generate a unique ID for the transaction using the transaction hash and log index.
   // This ensures that each transaction has a distinct identifier.
   let transaction = new Transaction(getGlobalId(event));
-
-  // Associate the transaction with the account entity by setting the account ID.
-  transaction.account = account.id;
-
-  // Set the type of transaction, such as "TRADE", "MINT", or "TRANSFER".
-  // The function getTransactionType ensures the transaction type is valid.
-  transaction.transactionType = getTransactionType(transactionType);
 
   // Initialize counters and flags for additional transaction-related metrics.
   // These are initialized to zero or false, providing a default starting state.
   transaction.nftSalePrice = BIGINT_ZERO;
   transaction.totalNFTsSold = BIGINT_ZERO;
   transaction.totalSalesVolume = BIGINT_ZERO; // Default NFT sale price set to zero.
-  transaction.averageSalePrice = BIGINT_ZERO; // Default total NFTs sold set to zero.
+  transaction.averageSalePrice = BIGDECIMAL_ZERO; // Default total NFTs sold set to zero.
   transaction.totalSalesCount = BIGINT_ZERO;
   transaction.highestSalePrice = BIGINT_ZERO;
   transaction.lowestSalePrice = BIGINT_ZERO;
@@ -83,4 +80,48 @@ export function recordTransactionHistory(
 
   // Save the AccountHistory entity to the store.
   history.save();
+}
+
+/**
+ * Determines the type of transaction (MINT, TRADE, or TRANSFER) based on the TransferEvent.
+ *
+ * @param event - The TransferEvent emitted by the contract.
+ * @returns - A TransactionType indicating the type of transaction.
+ */
+export function getTransactionType(event: TransferEvent): TransactionType {
+  // Check if the `from` address in the event is the zero address.
+  // If so, it indicates that this transaction is a mint (i.e., the creation of a new token).
+  let isMint = event.params.from == ZERO_ADDRESS;
+
+  // If the transaction is a mint, return the TransactionType.MINT enum value.
+  if (isMint) {
+    return TransactionType.MINT;
+  } else {
+    // If the transaction is not a mint, retrieve the transaction receipt to check the logs.
+    let receipt = event.receipt;
+
+    // Ensure that the receipt is not null (i.e., the receipt exists).
+    if (receipt) {
+      // Loop through each log entry in the transaction receipt.
+      for (let i = 0; i < receipt.logs.length; i++) {
+        let currLog = receipt.logs[i];
+
+        // Check if the current log has topics (a non-empty list of topics).
+        // The first topic (topics[0]) should be compared against the OrdersMatched event signature.
+        if (
+          currLog.topics.length > 0 &&
+          currLog.topics[0].equals(ORDERS_MATCHED_SIG)
+        ) {
+          // If the log's first topic matches the OrdersMatched signature, this transaction is a trade/sale.
+          // Return the TransactionType.TRADE enum value.
+          return TransactionType.TRADE;
+        }
+      }
+    }
+
+    // If the transaction is not a mint and there are no logs indicating a trade/sale,
+    // then the transaction is classified as a simple transfer.
+    // Return the TransactionType.TRANSFER enum value.
+    return TransactionType.TRANSFER;
+  }
 }

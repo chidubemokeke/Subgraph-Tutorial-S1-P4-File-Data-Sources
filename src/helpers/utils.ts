@@ -1,6 +1,13 @@
-import { BigInt, Bytes, ethereum } from "@graphprotocol/graph-ts";
+import { BigDecimal, BigInt, Bytes, ethereum } from "@graphprotocol/graph-ts";
 import { CovenToken } from "../../generated/schema";
-import { CRYPTOCOVEN_ADDRESS, BIGINT_ZERO } from "./constant";
+import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
+import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
+import {
+  CRYPTOCOVEN_ADDRESS,
+  OPENSEA_ADDRESS,
+  BIGINT_ZERO,
+  BIGDECIMAL_ZERO,
+} from "./constant";
 
 /**
  * Generates a unique identifier for a specific event in a transaction.
@@ -22,6 +29,89 @@ export function getGlobalId(event: ethereum.Event): string {
   return globalId;
 }
 
+/**
+ * Calculates the average sale price from a list of sale prices.
+ *
+ * @param totalSalesVolume - The total sales volume (sum of all sale prices).
+ * @param totalSalesCount - The total number of sales.
+ * @returns The average sale price as a BigDecimal.
+ */
+export function calculateAverageSalePrice(
+  totalSalesVolume: BigInt,
+  totalSalesCount: BigInt
+): BigDecimal {
+  // Check if there have been any sales
+  if (totalSalesCount.equals(BIGINT_ZERO)) {
+    // If no sales, return 0 as the average price
+    return BIGDECIMAL_ZERO;
+  }
+
+  // Convert the total sales volume and count to BigDecimal for division
+  let totalSalesVolumeDecimal = totalSalesVolume.toBigDecimal();
+  let totalSalesCountDecimal = totalSalesCount.toBigDecimal();
+
+  // Calculate the average sale price by dividing total sales volume by total sales count
+  return totalSalesVolumeDecimal.div(totalSalesCountDecimal);
+}
+
+/**
+ * Determines the highest sale price from a list of sale prices.
+ *
+ * @param salePrices - An array of sale prices.
+ * @returns The highest sale price as a BigInt.
+ */
+export function calculateHighestSalePrice(salePrices: BigInt[]): BigInt {
+  // Check if there are any sale prices in the array
+  if (salePrices.length === 0) {
+    // If no sale prices, return 0 as the highest price
+    return BIGINT_ZERO;
+  }
+
+  // Initialize the highest price with a starting value of 0
+  let highestPrice = BIGINT_ZERO;
+
+  // Loop through the list of sale prices to find the highest one
+  for (let i = 0; i < salePrices.length; i++) {
+    // Check if the current sale price is greater than the current highest price
+    if (salePrices[i].gt(highestPrice)) {
+      // If it is, update the highest price to the current sale price
+      highestPrice = salePrices[i];
+    }
+  }
+
+  // Return the highest sale price found in the array
+  return highestPrice;
+}
+
+/**
+ * Determines the lowest sale price from a list of sale prices.
+ *
+ * @param salePrices - An array of sale prices.
+ * @returns The lowest sale price as a BigInt.
+ */
+export function calculateLowestSalePrice(salePrices: BigInt[]): BigInt {
+  // Check if there are any sale prices in the array
+  if (salePrices.length === 0) {
+    // If no sale prices, return 0 as the lowest price
+    return BIGINT_ZERO;
+  }
+
+  // Initialize the lowest price with the first sale price in the array
+  let lowestPrice = salePrices[0];
+
+  // Loop through the rest of the sale prices to find the lowest one
+  for (let i = 1; i < salePrices.length; i++) {
+    // Check if the current sale price is less than the current lowest price
+    if (salePrices[i].lt(lowestPrice)) {
+      // If it is, update the lowest price to the current sale price
+      lowestPrice = salePrices[i];
+    }
+  }
+
+  // Return the lowest sale price found in the array
+  return lowestPrice;
+}
+
 // Helper function to update or create a CovenToken
 export function updateTokenOwner(
   tokenId: BigInt,
@@ -38,7 +128,7 @@ export function updateTokenOwner(
     // Initialize a new CovenToken entity if it does not exist
     token = new CovenToken(tokenId.toString());
     token.tokenId = tokenId;
-    token.tokenMintCount = BigInt.fromI32(0); // Default value for newly minted tokens
+    token.tokenMintCount = BIGINT_ZERO; // Default value for newly minted tokens
   }
 
   // Update token details
@@ -51,74 +141,63 @@ export function updateTokenOwner(
   // Save the token entity to the store
   token.save();
 }
-/**
- * Validates and returns the transaction type from a predefined set of types.
- * The allowed types are "TRADE", "MINT", and "TRANSFER".
- * If the provided type is not one of these, the function throws an error.
- *
- * @param type - The transaction type as a string.
- * @returns The validated transaction type.
- * @throws Error if the transaction type is invalid.
- */
-export function getTransactionType(type: string): string {
-  // Check if the provided type matches one of the predefined transaction types.
-  if (type == "TRADE" || type == "MINT" || type == "TRANSFER") {
-    return type; // Return the valid transaction type.
-  } else {
-    // Throw an error if the type is invalid, providing feedback on the mistake.
-    throw new Error("Invalid transaction type: " + type);
-  }
-}
 
-// Helper function to extract tokenId from logs using transaction receipt
+/**
+ * Extracts the tokenId from logs in a transaction receipt.
+ * This function assumes the logs are from the CryptoCoven contract and contains the tokenId in its data.
+ *
+ * @param receipt - The Ethereum transaction receipt containing logs.
+ * @returns The tokenId extracted from the logs as a BigInt, or null if not found.
+ */
 export function getTokenIdFromReceipt(
   receipt: ethereum.TransactionReceipt
-): string | null {
+): BigInt | null {
+  // Iterate through each log in the transaction receipt
   for (let i = 0; i < receipt.logs.length; i++) {
     let log = receipt.logs[i];
 
-    // Check if the log comes from the CryptoCoven contract (by comparing addresses)
+    // Check if the log is from the CryptoCoven contract
     if (log.address.toHex() == CRYPTOCOVEN_ADDRESS) {
-      // Parse the log to extract the tokenId (assuming the log contains this data)
+      // Decode the log data to extract the tokenId
       let decodedLog = ethereum.decode("(address,address,uint256)", log.data);
       if (decodedLog) {
         let tuple = decodedLog.toTuple();
-        let tokenId = tuple[2].toBigInt();
-        return tokenId.toString();
+        let tokenId = tuple[2].toBigInt(); // Extract tokenId from the decoded log
+        return tokenId; // Return the tokenId as a BigInt
       }
     }
   }
-  return null;
+  return null; // Return null if no tokenId is found
 }
 
 /**
- * Extracts the total NFTs involved in the transaction by analyzing logs in the transaction receipt.
- * The function loops through logs emitted by the specified contract and decodes the quantity of NFTs sold.
+ * Extracts the total number of NFTs involved in the transaction from the logs.
+ * This function assumes that logs from the CryptoCoven contract contain NFT quantities in their data.
  *
- * @param event - The Ethereum event that triggered the transaction.
- * @returns The total number of NFTs in the transaction.
+ * @param receipt - The Ethereum transaction receipt containing logs.
+ * @returns The total number of NFTs involved in the transaction as a BigInt.
  */
-export function extractNFTsFromLogs(event: ethereum.Event): BigInt {
-  // Initialize the total NFTs sold (On the assumption that more than one NFT could be sold.)
+export function extractNFTsFromLogs(
+  receipt: ethereum.TransactionReceipt
+): BigInt {
+  // Initialize the total number of NFTs
   let totalNFTs = BIGINT_ZERO;
 
-  // Retrieve the transaction receipt to access logs
-  let receipt = event.receipt;
-
+  // Check if the receipt is valid
   if (receipt) {
-    // Loop through each log in the receipt
+    // Iterate through each log in the transaction receipt
     for (let i = 0; i < receipt.logs.length; i++) {
       let log = receipt.logs[i];
 
-      // Check if the log comes from the CryptoCoven contract address
+      // Check if the log is from the CryptoCoven contract
       if (log.address.toHex() == CRYPTOCOVEN_ADDRESS) {
-        // Decode the log data
+        // Decode the log data to extract NFT quantities
         let decodedData = ethereum.decode("(uint256[])", log.data);
 
-        // Check if the decoded data is valid and has the expected type
-        if (decodedData && Array.isArray(decodedData)) {
-          // Extract the quantity from the decoded data
-          let quantities = decodedData as BigInt[];
+        // Check if the decoded data is valid
+        if (decodedData) {
+          let quantities = decodedData.toBigIntArray(); // Convert decoded data to BigInt array
+          // Sum up all NFT quantities
           for (let j = 0; j < quantities.length; j++) {
             totalNFTs = totalNFTs.plus(quantities[j]);
           }
@@ -127,6 +206,5 @@ export function extractNFTsFromLogs(event: ethereum.Event): BigInt {
     }
   }
 
-  // Return the total number of NFTs sold
-  return totalNFTs;
+  return totalNFTs; // Return the total number of NFTs
 }

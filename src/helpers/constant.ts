@@ -1,7 +1,16 @@
-import { BigInt, Bytes, crypto } from "@graphprotocol/graph-ts";
+import {
+  BigDecimal,
+  BigInt,
+  ByteArray,
+  Bytes,
+  crypto,
+} from "@graphprotocol/graph-ts";
 
 // Define a constant representing the value zero as a BigInt object.
 export const BIGINT_ZERO = BigInt.fromI32(0);
+
+// Define a constant representing the value zero as a BigInt object.
+export const BIGDECIMAL_ZERO = BigDecimal.fromString("0");
 
 // Define a constant representing the value one as a BigInt object.
 export const BIGINT_ONE = BigInt.fromI32(1);
@@ -15,6 +24,13 @@ export const ZERO_ADDRESS = Bytes.fromHexString(
 export const CRYPTOCOVEN_ADDRESS = "0x5180db8F5c931aaE63c74266b211F580155ecac8";
 
 export const OPENSEA_ADDRESS = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
+
+// Signature of the OrdersMatched event
+export const ORDERS_MATCHED_SIG = crypto.keccak256(
+  ByteArray.fromUTF8(
+    "OrdersMatched(bytes32,address,address,uint256,uint256,bytes32)"
+  )
+);
 
 // Define the event signature for the Transfer event
 export const TRANSFER_EVENT_SIGNATURE = "Transfer(address,address,uint256)";

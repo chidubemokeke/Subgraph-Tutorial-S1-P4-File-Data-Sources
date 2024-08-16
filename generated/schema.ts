@@ -748,17 +748,17 @@ export class Transaction extends Entity {
     this.set("totalSalesVolume", Value.fromBigInt(value));
   }
 
-  get averageSalePrice(): BigInt {
+  get averageSalePrice(): BigDecimal {
     let value = this.get("averageSalePrice");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
-      return value.toBigInt();
+      return value.toBigDecimal();
     }
   }
 
-  set averageSalePrice(value: BigInt) {
-    this.set("averageSalePrice", Value.fromBigInt(value));
+  set averageSalePrice(value: BigDecimal) {
+    this.set("averageSalePrice", Value.fromBigDecimal(value));
   }
 
   get totalSalesCount(): BigInt {

@@ -100,7 +100,7 @@ type Transaction @entity {
   id: ID!
   account: Account!
 
-  "Reference to the corresponding event/transaction in the CryptoCoven contract"
+  "Reference to the corresponding event/transaction in the CryptoCoven contract (TokenID)"
   referenceId: String!
 
   "Transaction type defined by the enum, Trade/Mint"
@@ -114,7 +114,7 @@ type Transaction @entity {
   totalNFTsSold: BigInt! # The total number of NFTs sold in this transaction (relevant for sales).
   "Aggregated data fields"
   totalSalesVolume: BigInt! # Aggregates the total amount sold across all transactions
-  averageSalePrice: BigInt! # Calculates the average price of NFTs sold.
+  averageSalePrice: BigDecimal! # Calculates the average price of NFTs sold.
   totalSalesCount: BigInt! # Tracks the total number of NFT sales.
   highestSalePrice: BigInt! # Records the highest sale price of an NFT.
   lowestSalePrice: BigInt! # Records the lowest sale price of an NFT.
