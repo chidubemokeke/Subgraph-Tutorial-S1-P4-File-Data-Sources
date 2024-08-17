@@ -16,7 +16,13 @@ export enum TransactionType {
  * @param address - The Ethereum address of the account as a Bytes object.
  * @returns The created or updated Account entity.
  */
-export function createOrUpdateAccount(address: Bytes): Account {
+export function createOrUpdateAccount(
+  address: Bytes,
+  logIndex: BigInt,
+  txHash: Bytes,
+  blockNumber: BigInt,
+  blockTimestamp: BigInt
+): Account {
   // Attempt to load the existing Account entity from the store using the address as the ID.
   let account = Account.load(address.toHex());
 
@@ -40,6 +46,10 @@ export function createOrUpdateAccount(address: Bytes): Account {
     account.isHunter = false; // Indicates if the account has minted and sold on OpenSea without buying.
     account.isFarmer = false; // Indicates if the account has minted, sold, and bought on OpenSea.
     account.isTrader = false; // Indicates if the account has only bought and sold on OpenSea.
+    account.logIndex = logIndex;
+    account.txHash = txHash;
+    account.blockNumber = blockNumber;
+    account.blockTimestamp = blockTimestamp;
 
     // Other fields like transactions and history will be automatically populated via @derivedFrom.
   }
@@ -71,7 +81,7 @@ export function updateAccountHistory(
   // Update specific counters and amounts based on the transaction type.
   if (transactionType === TransactionType.MINT) {
     // If the transaction is a mint, increment the mint count.
-    account.mintCount = account.mintCount.plus(account.mintCount);
+    account.mintCount = account.mintCount.plus(BIGINT_ONE);
   } else if (transactionType === TransactionType.TRADE && isSale) {
     // If the transaction is a sale, increment the sale count and update the total amount sold.
     account.saleCount = account.saleCount.plus(BIGINT_ONE);
@@ -91,12 +101,12 @@ export function updateAccountHistory(
 }
 /**
  * Determines the account type based on the account's transaction history.
- * The function sets boolean flags to categorize the account as an OG, Collector, Hunter, Farmer, or Trader.
+ * The function returns a string representing the account type, which can be OG, Collector, Hunter, Farmer, or Trader.
  *
  * @param account - The Account entity to evaluate.
- * @returns The updated Account entity with the appropriate type flags set.
+ * @returns The account type as a string.
  */
-export function determineAccountType(account: Account): Account {
+export function determineAccountType(account: Account): string {
   // Determine the account type based on the mint, buy, and sale counts.
 
   if (
@@ -105,64 +115,37 @@ export function determineAccountType(account: Account): Account {
     account.saleCount.equals(BIGINT_ZERO)
   ) {
     // Account is an OG if it has only minted and not bought or sold.
-    account.isOG = true;
-    account.isCollector = false;
-    account.isHunter = false;
-    account.isFarmer = false;
-    account.isTrader = false;
+    return "OG";
   } else if (
     account.mintCount.ge(BIGINT_ONE) &&
     account.buyCount.ge(BIGINT_ONE) &&
     account.saleCount.equals(BIGINT_ZERO)
   ) {
     // Account is a Collector if it has minted and bought but not sold.
-    account.isOG = false;
-    account.isCollector = true;
-    account.isHunter = false;
-    account.isFarmer = false;
-    account.isTrader = false;
+    return "Collector";
   } else if (
     account.mintCount.ge(BIGINT_ONE) &&
     account.saleCount.ge(BIGINT_ONE) &&
     account.buyCount.equals(BIGINT_ZERO)
   ) {
     // Account is a Hunter if it has minted and sold but not bought.
-    account.isOG = false;
-    account.isCollector = false;
-    account.isHunter = true;
-    account.isFarmer = false;
-    account.isTrader = false;
+    return "Hunter";
   } else if (
     account.mintCount.ge(BIGINT_ONE) &&
     account.saleCount.ge(BIGINT_ONE) &&
     account.buyCount.ge(BIGINT_ONE)
   ) {
     // Account is a Farmer if it has minted, bought, and sold.
-    account.isOG = false;
-    account.isCollector = false;
-    account.isHunter = false;
-    account.isFarmer = true;
-    account.isTrader = false;
+    return "Farmer";
   } else if (
     account.mintCount.equals(BIGINT_ZERO) &&
     account.saleCount.ge(BIGINT_ONE) &&
     account.buyCount.ge(BIGINT_ONE)
   ) {
     // Account is a Trader if it has bought and sold but not minted.
-    account.isOG = false;
-    account.isCollector = false;
-    account.isHunter = false;
-    account.isFarmer = false;
-    account.isTrader = true;
+    return "Trader";
   } else {
-    // If none of the above conditions are met, reset all flags to false.
-    account.isOG = false;
-    account.isCollector = false;
-    account.isHunter = false;
-    account.isFarmer = false;
-    account.isTrader = false;
+    // If none of the above conditions are met, return "Unknown" or another default type.
+    return "Unknown";
   }
-
-  // Return the account entity with updated type flags.
-  return account;
 }

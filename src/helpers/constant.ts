@@ -23,7 +23,11 @@ export const ZERO_ADDRESS = Bytes.fromHexString(
 // Define a constant representing the address of the CryptoCoven contract.
 export const CRYPTOCOVEN_ADDRESS = "0x5180db8F5c931aaE63c74266b211F580155ecac8";
 
-export const OPENSEA_ADDRESS = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
+export const COVEN_ADDRESS = Bytes.fromUTF8(CRYPTOCOVEN_ADDRESS);
+
+export const OPENSEA_ADDRESS = Bytes.fromUTF8(
+  "0x7f268357A8c2552623316e2562D90e642bB538E5"
+);
 
 // Signature of the OrdersMatched event
 export const ORDERS_MATCHED_SIG = crypto.keccak256(
@@ -33,10 +37,24 @@ export const ORDERS_MATCHED_SIG = crypto.keccak256(
 );
 
 // Define the event signature for the Transfer event
-export const TRANSFER_EVENT_SIGNATURE = "Transfer(address,address,uint256)";
+export const transferEventSignature =
+  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f6e2a1be4d2d8e";
+
+export const TRANSFER_EVENT_SIG = crypto.keccak256(
+  ByteArray.fromUTF8("Transfer(address,address,uint256)")
+);
+
+// Define the event signature for the ordersMatched event in OpenSea
+export const ordersMatchedEventSignature = crypto
+  .keccak256(
+    Bytes.fromUTF8(
+      "OrdersMatched(bytes32,bytes32,address,address,uint256,bytes32)"
+    )
+  )
+  .toHexString();
 
 // Convert the event signature to a Bytes object
-let eventSignatureBytes = Bytes.fromUTF8(TRANSFER_EVENT_SIGNATURE);
+/** let eventSignatureBytes = Bytes.fromUTF8(TRANSFER_EVENT_SIGNATURE);
 
 // Compute the Keccak-256 (SHA3-256) hash of the event signature
 export const TRANSFER_EVENT_SIGNATURE_HASH = crypto

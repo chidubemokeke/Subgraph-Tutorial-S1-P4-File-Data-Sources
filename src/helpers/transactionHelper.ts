@@ -8,6 +8,7 @@ import {
 } from "./constant";
 import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
 import { getGlobalId } from "./utils";
+import { determineAccountType } from "./accountHelper";
 
 // Define the enum with the three transaction types
 export enum TransactionType {
@@ -50,8 +51,8 @@ export function initializeTransaction(event: ethereum.Event): Transaction {
 
 /**
  * Records the transaction history for a given account by creating a new AccountHistory entity.
- * This entity captures the state of the account at the time of the event, including transaction counts
- * and the details of the event (log index, transaction hash, block number, and timestamp).
+ * This entity captures the state of the account at the time of the event, including transaction counts,
+ * account type, and the details of the event (log index, transaction hash, block number, and timestamp).
  *
  * @param account - The Account entity whose history is being recorded.
  * @param event - The Ethereum event that triggered the transaction.
@@ -71,6 +72,9 @@ export function recordTransactionHistory(
   history.mintCount = account.mintCount;
   history.buyCount = account.buyCount;
   history.saleCount = account.saleCount;
+
+  // Determine the account type at the time of the history record.
+  history.accountType = determineAccountType(account);
 
   // Record the details of the Ethereum event (log index, transaction hash, block number, and timestamp).
   history.logIndex = event.logIndex;

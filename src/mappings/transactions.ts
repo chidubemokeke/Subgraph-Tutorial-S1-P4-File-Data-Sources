@@ -1,4 +1,4 @@
-import { log } from "@graphprotocol/graph-ts";
+import { BigInt, log } from "@graphprotocol/graph-ts";
 import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
 import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
 import {
@@ -18,7 +18,7 @@ import {
   initializeTransaction,
   getTransactionType,
 } from "../helpers/transactionHelper";
-import { BIGINT_ONE } from "../helpers/constant";
+import { BIGINT_ONE, ZERO_ADDRESS } from "../helpers/constant";
 
 // Define the enum with the three transaction types
 export enum TransactionType {
@@ -28,27 +28,50 @@ export enum TransactionType {
 }
 
 /**
- * Handles a transfer event which could be a mint, trade, or standard transfer.
+ * Handles the Transfer event emitted by the CryptoCoven contract.
+ * This event may represent a minting, trading, or standard transfer of an NFT.
  *
- * @param event - The TransferEvent emitted by the contract.
+ * @param event - The TransferEvent emitted by the CryptoCoven contract.
  */
 export function handleTransfer(event: TransferEvent): void {
-  // Determine the transaction type (MINT, TRADE, or TRANSFER) based on the event details
-  let transactionType: TransactionType = getTransactionType(event);
+  // Check if this is a minting event (from the zero address)
+  let isMinting = event.params.from == ZERO_ADDRESS;
 
-  // Extract the total number of NFTs involved in this transaction from the logs
-  let totalNFTs = extractNFTsFromLogs(event.receipt!);
+  // Retrieve or create account entities for the sender and recipient.
+  let fromAccount = createOrUpdateAccount(
+    event.params.from,
+    event.logIndex,
+    event.transaction.hash,
+    event.block.number,
+    event.block.timestamp
+  ); // Sender's address
+  let toAccount = createOrUpdateAccount(
+    event.params.to,
+    event.logIndex,
+    event.transaction.hash,
+    event.block.number,
+    event.block.timestamp
+  ); // Recipient's address
 
-  // Log if an airdrop is detected or if multiple NFTs are purchased
-  if (transactionType === TransactionType.MINT || totalNFTs > BIGINT_ONE) {
+  // Determine the type of transaction based on event details.
+  let transactionType: TransactionType = isMinting
+    ? TransactionType.MINT
+    : getTransactionType(event);
+
+  // Extract the total number of NFTs involved in this transaction from the event's logs.
+  let totalNFTs = extractNFTsFromLogs(event);
+
+  // Log if the transaction is a mint or involves multiple NFTs (indicating a potential airdrop).
+  if (transactionType === TransactionType.MINT || totalNFTs.length > 1) {
     log.info("Airdrop or multiple NFT purchase detected", [
       totalNFTs.toString(),
     ]);
   }
 
-  // Update the CovenToken entity with details from the transfer event
+  // Update the owner of the NFT in the CovenToken entity with the details from the transfer event.
   updateTokenOwner(
-    event.params.tokenId,
+    event.params.tokenId, // Token ID of the transferred NFT
+    event.params.from,
     event.params.to,
     event.logIndex,
     event.transaction.hash,
@@ -56,78 +79,98 @@ export function handleTransfer(event: TransferEvent): void {
     event.block.timestamp
   );
 
-  // Get or create the account entities for the sender and recipient
-  let fromAccount = createOrUpdateAccount(event.params.from);
-  let toAccount = createOrUpdateAccount(event.params.to);
-
-  // Determine if this is a sale (assume sale if transaction type is TRADE)
+  // Determine if this transfer is part of a sale.
   let isSale = transactionType === TransactionType.TRADE;
 
-  // Update account history for both sender and recipient based on transaction type
-  updateAccountHistory(fromAccount, transactionType, totalNFTs, isSale);
-  updateAccountHistory(toAccount, transactionType, totalNFTs, !isSale);
+  // Update the historical account data for both the sender and recipient based on the transaction type.
+  updateAccountHistory(
+    fromAccount,
+    transactionType,
+    BigInt.fromI32(totalNFTs.length),
+    isSale
+  ); // Update sender's account history
+  updateAccountHistory(
+    toAccount,
+    transactionType,
+    BigInt.fromI32(totalNFTs.length),
+    !isSale
+  ); // Update recipient's account history
 
-  // Determine the account type based on historical transactions
-  determineAccountType(fromAccount);
-  determineAccountType(toAccount);
+  // Analyze the account's transaction history to determine its type (e.g., trader, holder).
+  determineAccountType(fromAccount); // Determine sender's account type
+  determineAccountType(toAccount); // Determine recipient's account type
 
-  // Save the updated account entities to persist the changes
+  // Persist the updated account entities to the store.
   fromAccount.save();
   toAccount.save();
 }
 
 /**
- * Handles the OrdersMatched event, representing a sale on OpenSea.
+ * Handles the OrdersMatched event emitted by the OpenSea contract.
+ * This event represents a completed sale transaction on OpenSea.
  *
- * @param event - The OrdersMatchedEvent emitted by the contract.
+ * @param event - The OrdersMatchedEvent emitted by the OpenSea contract.
  */
 export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
-  // Step 1: Initialize a new Transaction entity using the event details
-  let transaction = initializeTransaction(event);
-
-  // Step 2: Extract the tokenId from the event receipt using the helper function
-  let tokenId = getTokenIdFromReceipt(event.receipt!);
-  if (tokenId === null) {
-    log.warning(
-      "Token ID could not be extracted from the transaction receipt.",
-      []
-    );
-    return;
-  }
-
-  // Step 3: Update the Transaction entity with the extracted tokenId
-  transaction.referenceId = tokenId.toHex();
-
-  // Step 4: Update the CovenToken entity to reflect the new owner of the token
-  updateTokenOwner(
-    tokenId,
-    event.params.taker, // Buyer is the new owner
+  // Step 5: Retrieve or create Account entities for both the seller and buyer.
+  let seller = createOrUpdateAccount(
+    event.params.maker,
     event.logIndex,
     event.transaction.hash,
     event.block.number,
     event.block.timestamp
+  ); // Seller's address
+  let buyer = createOrUpdateAccount(
+    event.params.taker,
+    event.logIndex,
+    event.transaction.hash,
+    event.block.number,
+    event.block.timestamp
+  ); // Buyer's address
+
+  // Step 1: Initialize a new Transaction entity using the details from the OrdersMatched event.
+  let transaction = initializeTransaction(event);
+
+  // Step 2: Extract the tokenId of the NFT involved in the sale from the event receipt.
+  let tokenId = getTokenIdFromReceipt(event);
+
+  // If tokenId is null, log a warning and exit the function to prevent errors.
+  if (tokenId === null) {
+    log.warning("Didint extract", [event.transaction.hash.toHex()]);
+    return;
+  }
+
+  // Step 3: Update the Transaction entity with the extracted tokenId.
+  transaction.referenceId = tokenId;
+
+  // Step 4: Update the CovenToken entity to reflect the new owner of the NFT after the sale.
+  updateTokenOwner(
+    tokenId, // Token ID of the sold NFT
+    event.params.maker,
+    event.params.taker,
+    event.logIndex,
+    event.transaction.hash,
+    event.block.number,
+    event.block.timestamp // Buyer's address (new owner)
   );
 
-  // Step 5: Retrieve or create Account entities for both seller and buyer
-  let seller = createOrUpdateAccount(event.params.maker); // Seller's address
-  let buyer = createOrUpdateAccount(event.params.taker); // Buyer's address
-
-  // Step 6: Extract the sale price from the event parameters
+  // Step 6: Extract the sale price from the event parameters.
   let salePrice = event.params.price;
 
-  // Step 7: Determine the number of NFTs sold by analyzing the logs
-  let totalNFTsSold = extractNFTsFromLogs(event.receipt!);
+  // Step 7: Determine the number of NFTs sold by analyzing the logs in the event receipt.
+  let totalNFTsSold = extractNFTsFromLogs(event);
 
-  // Step 8: Log if multiple NFTs are purchased in a single transaction
-  if (totalNFTsSold > BIGINT_ONE) {
+  // If multiple NFTs were sold in a single transaction, log this information.
+  if (totalNFTsSold.length > 1) {
     log.info("Multiple NFTs purchased in a single transaction", [
       totalNFTsSold.toString(),
     ]);
   }
 
+  // Step 8: Calculate various statistics related to the sale, such as average, highest, and lowest prices.
   let salePrices = [salePrice]; // Collect all sale prices (for example purposes)
-  let totalSalesVolume = salePrice.times(totalNFTsSold);
-  let totalSalesCount = BIGINT_ONE; // Count of sales in this example
+  let totalSalesVolume = salePrice.times(BigInt.fromI32(totalNFTsSold.length)); // Calculate total sales volume
+  let totalSalesCount = BIGINT_ONE; // Count of sales in this example (one transaction)
 
   let averageSalePrice = calculateAverageSalePrice(
     totalSalesVolume,
@@ -136,27 +179,37 @@ export function handleOpenSeaSale(event: OrdersMatchedEvent): void {
   let highestSalePrice = calculateHighestSalePrice(salePrices);
   let lowestSalePrice = calculateLowestSalePrice(salePrices);
 
-  // Step 9: Update the Transaction entity with sale details
+  // Step 9: Update the Transaction entity with the calculated sale details.
   transaction.nftSalePrice = salePrice;
-  transaction.totalNFTsSold = totalNFTsSold;
+  transaction.totalNFTsSold = BigInt.fromI32(totalNFTsSold.length);
   transaction.totalSalesVolume = totalSalesVolume;
   transaction.averageSalePrice = averageSalePrice;
   transaction.totalSalesCount = totalSalesCount;
   transaction.highestSalePrice = highestSalePrice;
   transaction.lowestSalePrice = lowestSalePrice;
 
-  // Step 10: Save the transaction entity
+  // Step 10: Save the updated Transaction entity to persist the sale details.
   transaction.save();
 
-  // Step 11: Update account history for both the seller and buyer based on the sale
-  updateAccountHistory(seller, TransactionType.TRADE, totalNFTsSold, true); // Update seller's history
-  updateAccountHistory(buyer, TransactionType.TRADE, totalNFTsSold, false); // Update buyer's history
+  // Step 11: Update the historical account data for both the seller and buyer based on the sale.
+  updateAccountHistory(
+    seller,
+    TransactionType.TRADE,
+    BigInt.fromI32(totalNFTsSold.length),
+    true
+  ); // Update seller's account history
+  updateAccountHistory(
+    buyer,
+    TransactionType.TRADE,
+    BigInt.fromI32(totalNFTsSold.length),
+    false
+  ); // Update buyer's account history
 
-  // Step 12: Determine the account type based on historical transactions
-  determineAccountType(seller);
-  determineAccountType(buyer);
+  // Step 12: Analyze the account's transaction history to determine its type (e.g., trader, holder).
+  determineAccountType(seller); // Determine seller's account type
+  determineAccountType(buyer); // Determine buyer's account type
 
-  // Step 13: Save the updated account entities to persist the changes
+  // Step 13: Persist the updated account entities to the store.
   seller.save();
   buyer.save();
 }

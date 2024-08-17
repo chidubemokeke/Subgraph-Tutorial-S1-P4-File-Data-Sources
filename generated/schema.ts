@@ -393,6 +393,19 @@ export class AccountHistory extends Entity {
     this.set("saleCount", Value.fromBigInt(value));
   }
 
+  get accountType(): string {
+    let value = this.get("accountType");
+    if (!value || value.kind == ValueKind.NULL) {
+      throw new Error("Cannot return null for a required field.");
+    } else {
+      return value.toString();
+    }
+  }
+
+  set accountType(value: string) {
+    this.set("accountType", Value.fromString(value));
+  }
+
   get logIndex(): BigInt {
     let value = this.get("logIndex");
     if (!value || value.kind == ValueKind.NULL) {
@@ -657,17 +670,17 @@ export class Transaction extends Entity {
     this.set("account", Value.fromString(value));
   }
 
-  get referenceId(): string {
+  get referenceId(): BigInt {
     let value = this.get("referenceId");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
-      return value.toString();
+      return value.toBigInt();
     }
   }
 
-  set referenceId(value: string) {
-    this.set("referenceId", Value.fromString(value));
+  set referenceId(value: BigInt) {
+    this.set("referenceId", Value.fromBigInt(value));
   }
 
   get transactionType(): string {

@@ -63,6 +63,8 @@ type AccountHistory @entity {
   mintCount: BigInt! # Mint count at the time of the history record
   buyCount: BigInt! # Buy count at the time of the history record
   saleCount: BigInt! # Sale count at the time of the history record
+  "The type of account at the time of the history record (e.g., OG, Collector, Hunter, Farmer, Trader)."
+  accountType: String!
   "Transaction Details"
   logIndex: BigInt! # Index of the log within the transaction
   txHash: Bytes!
@@ -101,7 +103,7 @@ type Transaction @entity {
   account: Account!
 
   "Reference to the corresponding event/transaction in the CryptoCoven contract (TokenID)"
-  referenceId: String!
+  referenceId: BigInt!
 
   "Transaction type defined by the enum, Trade/Mint"
   transactionType: TransactionType!

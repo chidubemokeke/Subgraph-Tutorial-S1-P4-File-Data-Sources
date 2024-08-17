@@ -1,13 +1,25 @@
-import { BigDecimal, BigInt, Bytes, ethereum } from "@graphprotocol/graph-ts";
-import { CovenToken } from "../../generated/schema";
-import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
-import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
 import {
-  CRYPTOCOVEN_ADDRESS,
+  Address,
+  BigDecimal,
+  BigInt,
+  ByteArray,
+  Bytes,
+  ethereum,
+  log,
+  crypto,
+} from "@graphprotocol/graph-ts";
+import { CovenToken } from "../../generated/schema";
+import {
   OPENSEA_ADDRESS,
+  ordersMatchedEventSignature,
   BIGINT_ZERO,
   BIGDECIMAL_ZERO,
+  BIGINT_ONE,
+  ZERO_ADDRESS,
+  TRANSFER_EVENT_SIG,
+  ORDERS_MATCHED_SIG,
 } from "./constant";
+import { createOrUpdateAccount } from "./accountHelper";
 
 /**
  * Generates a unique identifier for a specific event in a transaction.
@@ -112,36 +124,134 @@ export function calculateLowestSalePrice(salePrices: BigInt[]): BigInt {
   return lowestPrice;
 }
 
-// Helper function to update or create a CovenToken
+/**
+ * Updates the ownership of a token, tracking both the previous (from) and new (to) owners.
+ *
+ * @param tokenId - The ID of the token being transferred.
+ * @param from - The previous owner's address.
+ * @param to - The new owner's address.
+ * @param logIndex - The index of the log in the transaction.
+ * @param transactionHash - The hash of the transaction.
+ * @param blockNumber - The block number of the transaction.
+ * @param timestamp - The timestamp of the block.
+ */
 export function updateTokenOwner(
   tokenId: BigInt,
-  newOwner: Bytes,
+  from: Address,
+  to: Address,
   logIndex: BigInt,
   txHash: Bytes,
   blockNumber: BigInt,
   blockTimestamp: BigInt
 ): void {
-  // Load the token entity or create a new one if it doesn't exist
-  let token = CovenToken.load(tokenId.toString());
+  // Load the CovenToken entity using the tokenId, converting it to a hex string as the ID.
+  let token = CovenToken.load(tokenId.toHex());
 
-  if (!token) {
-    // Initialize a new CovenToken entity if it does not exist
-    token = new CovenToken(tokenId.toString());
-    token.tokenId = tokenId;
-    token.tokenMintCount = BIGINT_ZERO; // Default value for newly minted tokens
+  // If the token does not exist (first time being transferred), create a new CovenToken entity.
+  if (token === null) {
+    token = new CovenToken(tokenId.toHex());
+    token.tokenId = tokenId; // Set the tokenId
+    token.tokenMintCount = BIGINT_ONE; // Initialize the mint count as 1 since this is the first time it is being minted
+    token.from = from.toHex();
+    token.to = to.toHex();
+    token.logIndex = logIndex;
+    token.txHash = txHash;
+    token.blockNumber = blockNumber;
+    token.blockTimestamp = blockTimestamp;
   }
 
-  // Update token details
-  token.owner = newOwner;
-  token.logIndex = logIndex;
-  token.txHash = txHash;
-  token.blockNumber = blockNumber;
-  token.blockTimestamp = blockTimestamp;
+  // Check if the 'from' address is not the zero address (indicating a transfer)
+  if (from !== ZERO_ADDRESS) {
+    let fromAccount = createOrUpdateAccount(
+      from,
+      logIndex,
+      txHash,
+      blockNumber,
+      blockTimestamp
+    );
+    fromAccount.save();
+  }
 
-  // Save the token entity to the store
+  // Assign the new owner and ensure 'to' is not null
+  if (to !== ZERO_ADDRESS) {
+    token.owner = to;
+  } else {
+    log.warning(
+      "The 'to' address is the zero address, indicating a possible burn or invalid transfer.",
+      []
+    );
+    return; // Early exit if 'to' is zero address
+  }
+
+  // Save the updated CovenToken entity
   token.save();
+
+  let toAccount = createOrUpdateAccount(
+    to,
+    logIndex,
+    txHash,
+    blockNumber,
+    blockTimestamp
+  );
+  toAccount.save();
 }
 
+export function getTokenIdFromReceipt(event: ethereum.Event): BigInt | null {
+  // Ensure the event has a receipt
+  if (!event.receipt) {
+    log.warning("[getTokenIdFromReceipt][{}] has no event.receipt", [
+      event.transaction.hash.toHexString(),
+    ]);
+    return null;
+  }
+
+  // Extract the log index of the current event
+  const currentEventLogIndex = event.logIndex;
+  // Retrieve the logs from the transaction receipt
+  const logs = event.receipt!.logs;
+  // Compute the Keccak-256 hash of the OrdersMatched event signature
+  const ordersMatchedSig = crypto.keccak256(
+    ByteArray.fromUTF8(
+      "OrdersMatched(bytes32,bytes32,address,address,uint256,uint256,uint256,uint256,address,uint8,uint8,uint8,bytes32)"
+    )
+  );
+
+  // Initialize a variable to keep track of the index where the OrdersMatched event is found
+  let foundIndex: i32 = -1;
+  // Loop through the logs to find the log with the same log index as the current event
+  for (let i = 0; i < logs.length; i++) {
+    const currLog = logs.at(i);
+
+    // Check if the current log index matches the index of the current event
+    if (currLog.logIndex.equals(currentEventLogIndex)) {
+      // Record the index where the OrdersMatched event is found
+      foundIndex = i;
+      // Exit the loop as we have found the target log
+      break;
+    }
+  }
+
+  // If a log with the OrdersMatched event was found
+  if (foundIndex > 0) {
+    // Retrieve the previous log (one index before the OrdersMatched event)
+    const prevLog = logs.at(foundIndex - 1);
+    // Extract the topic0 from the previous log to identify the event signature
+    const topic0Sig = prevLog.topics.at(0); // topic0 is used to identify the event type
+    // Check if the event signature matches the OrdersMatched event signature
+    if (topic0Sig.equals(ordersMatchedSig)) {
+      // Decode the tokenId from the previous log's data
+      // Assuming tokenId is encoded as uint256 and is at the start of the data
+      const tokenId = ethereum
+        .decode("uint256", Bytes.fromUint8Array(prevLog.data.subarray(0, 32)))!
+        .toBigInt();
+      // Return the decoded tokenId
+      return tokenId;
+    }
+  }
+
+  // Return null if no matching tokenId was found
+  return null;
+}
 /**
  * Extracts the tokenId from logs in a transaction receipt.
  * This function assumes the logs are from the CryptoCoven contract and contains the tokenId in its data.
@@ -149,62 +259,108 @@ export function updateTokenOwner(
  * @param receipt - The Ethereum transaction receipt containing logs.
  * @returns The tokenId extracted from the logs as a BigInt, or null if not found.
  */
-export function getTokenIdFromReceipt(
+/**export function getTokenIdFromReceipt(
   receipt: ethereum.TransactionReceipt
 ): BigInt | null {
-  // Iterate through each log in the transaction receipt
-  for (let i = 0; i < receipt.logs.length; i++) {
-    let log = receipt.logs[i];
+  // Define the event signature for the Transfer event
 
-    // Check if the log is from the CryptoCoven contract
-    if (log.address.toHex() == CRYPTOCOVEN_ADDRESS) {
-      // Decode the log data to extract the tokenId
-      let decodedLog = ethereum.decode("(address,address,uint256)", log.data);
-      if (decodedLog) {
-        let tuple = decodedLog.toTuple();
-        let tokenId = tuple[2].toBigInt(); // Extract tokenId from the decoded log
-        return tokenId; // Return the tokenId as a BigInt
-      }
+  // Iterate over the logs in the receipt
+  for (let i = 0; i < receipt.logs.length; i++) {
+    let eventLog = receipt.logs[i];
+
+    // Check if the log is from the CryptoCoven contract and matches the Transfer event signature
+    if (
+      eventLog.address == OPENSEA_ADDRESS &&
+      eventLog.topics[0].toHexString() == TRANSFER_EVENT_SIG
+    ) {
+      // The Transfer event has 3 topics (indexed parameters) and 1 data field (non-indexed parameter)
+      // topics[1] = from (address)
+      // topics[2] = to (address)
+      // topics[3] = tokenId (uint256)
+
+      // Decode the tokenId from the second topic (it’s indexed)
+      let tokenId = BigInt.fromUnsignedBytes(eventLog.topics[2]);
+
+      log.info("Token ID extracted: {}", [tokenId.toString()]);
+
+      return tokenId;
     }
   }
-  return null; // Return null if no tokenId is found
-}
+
+  // If no tokenId is found, return null
+  log.warning("No tokenId found in the logs for the CryptoCoven contract.", []);
+  return null;
+}**/
 
 /**
  * Extracts the total number of NFTs involved in the transaction from the logs.
- * This function assumes that logs from the CryptoCoven contract contain NFT quantities in their data.
+ * This function assumes that logs from the OpenSea contract contain NFT quantities in their data.
  *
- * @param receipt - The Ethereum transaction receipt containing logs.
- * @returns The total number of NFTs involved in the transaction as a BigInt.
+ * @param event - The Ethereum event containing the transaction receipt.
+ * @returns An array of BigInt representing the token IDs of NFTs involved in the transaction, or an empty array if not found.
  */
-export function extractNFTsFromLogs(
-  receipt: ethereum.TransactionReceipt
-): BigInt {
-  // Initialize the total number of NFTs
-  let totalNFTs = BIGINT_ZERO;
+export function extractNFTsFromLogs(event: ethereum.Event): Array<BigInt> {
+  // Ensure the event has a receipt
+  if (!event.receipt) {
+    log.warning("[extractNFTsFromLogs][{}] has no event.receipt", [
+      event.transaction.hash.toHexString(),
+    ]);
+    return [];
+  }
 
-  // Check if the receipt is valid
-  if (receipt) {
-    // Iterate through each log in the transaction receipt
-    for (let i = 0; i < receipt.logs.length; i++) {
-      let log = receipt.logs[i];
+  // Extract the log index of the current event
+  const currentEventLogIndex = event.logIndex;
+  // Retrieve the logs from the transaction receipt
+  const logs = event.receipt!.logs;
+  // Compute the Keccak-256 hash of the OrdersMatched event signature
+  const ordersMatchedSig = crypto.keccak256(
+    ByteArray.fromUTF8(
+      "OrdersMatched(bytes32,bytes32,address,address,uint256,uint256,uint256,uint256,address,uint8,uint8,uint8,bytes32)"
+    )
+  );
 
-      // Check if the log is from the CryptoCoven contract
-      if (log.address.toHex() == CRYPTOCOVEN_ADDRESS) {
-        // Decode the log data to extract NFT quantities
-        let decodedData = ethereum.decode("(uint256[])", log.data);
+  // Initialize an array to store the extracted NFT token IDs
+  let nftTokenIds: Array<BigInt> = [];
+  // Flag to start processing logs after the current event's log index
+  let processLogs = false;
 
-        // Check if the decoded data is valid
-        if (decodedData) {
-          let quantities = decodedData.toBigIntArray(); // Convert decoded data to BigInt array
-          // Sum up all NFT quantities
-          for (let j = 0; j < quantities.length; j++) {
-            totalNFTs = totalNFTs.plus(quantities[j]);
-          }
+  // Iterate through all logs in the receipt
+  for (let i = 0; i < logs.length; i++) {
+    const currLog = logs.at(i);
+
+    // Set the flag to start processing when reaching the log index of the current event
+    if (currLog.logIndex.equals(currentEventLogIndex)) {
+      processLogs = true;
+    }
+
+    // Only process logs after the current event's log index
+    if (processLogs) {
+      // Check if the current log's topic0 matches the OrdersMatched event signature
+      const topic0Sig = currLog.topics.at(0);
+      if (topic0Sig.equals(ordersMatchedSig)) {
+        // Extract data from the log
+        // Assuming the log data contains NFT token IDs starting from byte 32 onwards
+        // Log data format: [32 bytes of extra data][32 bytes of token ID]
+        const data = currLog.data;
+        // Determine the number of NFTs by examining the length of data
+        const numNFTs = (data.length - 32) / 32; // each token ID is 32 bytes
+
+        // Extract each token ID from the log data
+        for (let j = 0; j < numNFTs; j++) {
+          // Extract the token ID from the data
+          const start = 32 + j * 32;
+          const end = start + 32;
+          const tokenId = ethereum
+            .decode("uint256", Bytes.fromUint8Array(data.subarray(start, end)))!
+            .toBigInt();
+
+          // Add the extracted token ID to the array
+          nftTokenIds.push(tokenId);
         }
       }
     }
   }
 
-  return totalNFTs; // Return the total number of NFTs
+  // Return the array of extracted NFT token IDs
+  return nftTokenIds;
 }
