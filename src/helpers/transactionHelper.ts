@@ -1,51 +1,47 @@
-import { ethereum } from "@graphprotocol/graph-ts";
-import { Account, AccountHistory, Transaction } from "../../generated/schema";
-import {
-  BIGINT_ZERO,
-  BIGDECIMAL_ZERO,
-  ORDERS_MATCHED_SIG,
-  ZERO_ADDRESS,
-} from "./constant";
-import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
-import { getGlobalId } from "./utils";
-import { determineAccountType } from "./accountHelper";
-
-// Define the enum with the three transaction types
-export enum TransactionType {
-  TRADE, // Represents a sale transaction where an NFT is sold
-  MINT, // Represents a mint transaction where a new NFT is created
-  TRANSFER, // Represents when an NFT is transferred without being sold on OpenSea
-}
+import { ethereum, Bytes } from "@graphprotocol/graph-ts";
+import { Transaction } from "../../generated/schema";
+import { BIGINT_ZERO, BIGDECIMAL_ZERO } from "./constant";
+import { getTransactionId } from "./utils";
 
 /**
- * Initializes a new Transaction entity based on the provided event.
- * @param event - The Ethereum event that triggered the transaction.
- * @returns The initialized Transaction entity.
+ * Creates or updates a Transaction entity using only the getTransactionId.
+ *
+ * @param event - The Ethereum event object containing transaction details.
  */
-export function initializeTransaction(event: ethereum.Event): Transaction {
-  // Generate a unique ID for the transaction using the transaction hash and log index.
-  // This ensures that each transaction has a distinct identifier.
-  let transaction = new Transaction(getGlobalId(event));
+export function createOrUpdateTransaction(event: ethereum.Event): Transaction {
+  // Generate the ID using the transaction hash and log index
+  let id = getTransactionId(event.transaction.hash, event.logIndex);
 
-  // Initialize counters and flags for additional transaction-related metrics.
-  // These are initialized to zero or false, providing a default starting state.
+  // Load the existing Transaction entity, or create a new one if it doesn't exist.
+  let transaction = Transaction.load(id);
+
+  if (transaction == null) {
+    // If the transaction doesn't exist, create a new entity.
+    transaction = new Transaction(id);
+  }
+
+  // Initialize or update other fields here as required.
+  transaction.txHash = event.transaction.hash;
+  transaction.logIndex = event.logIndex;
+  transaction.blockNumber = event.block.number;
+  transaction.blockTimestamp = event.block.timestamp;
+
+  // Additional fields can be initialized or updated here
+  transaction.account = transaction.id;
+  transaction.referenceId = BIGINT_ZERO;
+  transaction.buyer = Bytes.empty();
+  transaction.seller = Bytes.empty();
   transaction.nftSalePrice = BIGINT_ZERO;
   transaction.totalNFTsSold = BIGINT_ZERO;
-  transaction.totalSalesVolume = BIGINT_ZERO; // Default NFT sale price set to zero.
-  transaction.averageSalePrice = BIGDECIMAL_ZERO; // Default total NFTs sold set to zero.
+  transaction.totalSalesVolume = BIGINT_ZERO;
+  transaction.averageSalePrice = BIGDECIMAL_ZERO;
   transaction.totalSalesCount = BIGINT_ZERO;
   transaction.highestSalePrice = BIGINT_ZERO;
   transaction.lowestSalePrice = BIGINT_ZERO;
 
-  // Record the event details, such as log index, transaction hash, block number, and timestamp.
-  // This information is crucial for tracking when and where the transaction occurred on the blockchain.
-  transaction.logIndex = event.logIndex;
-  transaction.txHash = event.transaction.hash;
-  transaction.blockNumber = event.block.number;
-  transaction.blockTimestamp = event.block.timestamp;
+  // Save the Transaction entity.
+  transaction.save();
 
-  // Return the fully initialized Transaction entity.
-  // This entity is now ready to be saved and associated with other relevant data.
   return transaction;
 }
 
@@ -56,13 +52,13 @@ export function initializeTransaction(event: ethereum.Event): Transaction {
  *
  * @param account - The Account entity whose history is being recorded.
  * @param event - The Ethereum event that triggered the transaction.
- */
+
 export function recordTransactionHistory(
   account: Account,
   event: ethereum.Event
 ): void {
   // Generate a unique ID for the history entry using the transaction hash and log index.
-  let history = new AccountHistory(getGlobalId(event));
+  let history = new AccountHistory(getTransactionId(event));
 
   // Associate the history entry with the account.
   history.history = account.id;
@@ -84,14 +80,14 @@ export function recordTransactionHistory(
 
   // Save the AccountHistory entity to the store.
   history.save();
-}
+}*/
 
 /**
  * Determines the type of transaction (MINT, TRADE, or TRANSFER) based on the TransferEvent.
  *
  * @param event - The TransferEvent emitted by the contract.
  * @returns - A TransactionType indicating the type of transaction.
- */
+ 
 export function getTransactionType(event: TransferEvent): TransactionType {
   // Check if the `from` address in the event is the zero address.
   // If so, it indicates that this transaction is a mint (i.e., the creation of a new token).
@@ -128,4 +124,4 @@ export function getTransactionType(event: TransferEvent): TransactionType {
     // Return the TransactionType.TRANSFER enum value.
     return TransactionType.TRANSFER;
   }
-}
+}*/

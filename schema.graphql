@@ -72,7 +72,7 @@ type AccountHistory @entity {
   blockTimestamp: BigInt!
 }
 
-# Represents Coven token Transfer Events
+# Represents Coven token Transfer Events (handleTransfer)
 type CovenToken @entity {
   "TxHash + logNumber #This ID/Entity is used for referencing events in the same transaction"
   id: ID!

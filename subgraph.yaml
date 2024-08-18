@@ -45,7 +45,10 @@ dataSources:
       eventHandlers:
         - event: Transfer(indexed address,indexed address,indexed uint256)
           # Function to handle the Transfer event
-          handler: handleTransfer
+          handler:
+            handleTransfer
+            # Enable receipt processing to access additional data from the transaction logs to verify transaction type from logs
+          receipt: true
       # Path to the TypeScript file that contains the event handler implementations
       file: src/mappings/transactions.ts
 

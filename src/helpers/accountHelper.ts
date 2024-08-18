@@ -1,5 +1,5 @@
-import { BigInt, Bytes } from "@graphprotocol/graph-ts";
-import { Account } from "../../generated/schema";
+import { Bytes } from "@graphprotocol/graph-ts";
+import { Account, AccountHistory } from "../../generated/schema";
 import { BIGINT_ONE, BIGINT_ZERO } from "./constant";
 
 // Define the enum with the three transaction types
@@ -9,103 +9,191 @@ export enum TransactionType {
   TRANSFER, // Represents when an NFT is transferred without being sold on OpenSea
 }
 /**
- * Creates a new Account entity or updates an existing one with default values if necessary.
- * This function ensures that all accounts involved in transactions are properly initialized
- * and tracked. It initializes default values for all relevant fields when a new account is created.
+ * This function is responsible for loading an Account entity from the store using its ID.
+ * If the Account doesn't exist, it creates a new Account entity and initializes its fields.
  *
- * @param address - The Ethereum address of the account as a Bytes object.
- * @returns The created or updated Account entity.
+ * @param accountId - The unique identifier for the account, typically the user's address.
+ * @returns The loaded or newly created Account entity.
  */
-export function createOrUpdateAccount(
-  address: Bytes,
-  logIndex: BigInt,
-  txHash: Bytes,
-  blockNumber: BigInt,
-  blockTimestamp: BigInt
-): Account {
-  // Attempt to load the existing Account entity from the store using the address as the ID.
-  let account = Account.load(address.toHex());
+export function loadOrCreateAccount(accountId: Bytes): Account {
+  // Attempt to load the account from the Graph store using the accountId.
+  let account = Account.load(accountId.toHex());
 
-  // If the account doesn't exist in the store (i.e., it's null), create a new one.
+  // If the account doesn't exist (i.e., it's null), we create a new one.
   if (!account) {
-    // Initialize a new Account entity using the address as the unique ID.
-    account = new Account(address.toHex());
+    account = new Account(accountId.toHex());
 
-    // Initialize all transaction-related counters and aggregated fields to zero.
-    account.transactionCount = BIGINT_ZERO; // Set the initial transaction count to 0.
-    account.mintCount = BIGINT_ZERO; // Set the initial mint count to 0.
-    account.buyCount = BIGINT_ZERO; // Set the initial buy count to 0.
-    account.saleCount = BIGINT_ZERO; // Set the initial sale count to 0.
-    account.totalAmountBought = BIGINT_ZERO; // Set the initial total amount bought to 0.
-    account.totalAmountSold = BIGINT_ZERO; // Set the initial total amount sold to 0.
-    account.totalAmountBalance = BIGINT_ZERO; // Set the initial total amount balance to 0.
+    // Initialize transaction-related fields to zero. These fields track the number of different types of transactions.
+    account.transactionCount = BIGINT_ZERO;
+    account.mintCount = BIGINT_ZERO;
+    account.buyCount = BIGINT_ZERO;
+    account.saleCount = BIGINT_ZERO;
 
-    // Initialize all boolean flags related to account types to false.
-    account.isOG = false; // Indicates if the account has only minted and holds.
-    account.isCollector = false; // Indicates if the account has minted and bought on OpenSea and holds.
-    account.isHunter = false; // Indicates if the account has minted and sold on OpenSea without buying.
-    account.isFarmer = false; // Indicates if the account has minted, sold, and bought on OpenSea.
-    account.isTrader = false; // Indicates if the account has only bought and sold on OpenSea.
-    account.logIndex = logIndex;
-    account.txHash = txHash;
-    account.blockNumber = blockNumber;
-    account.blockTimestamp = blockTimestamp;
+    // Initialize financial-related fields to zero. These fields track the amount of tokens bought, sold, and the current balance.
+    account.totalAmountBought = BIGINT_ZERO;
+    account.totalAmountSold = BIGINT_ZERO;
+    account.totalAmountBalance = BIGINT_ZERO;
 
-    // Other fields like transactions and history will be automatically populated via @derivedFrom.
+    // Initialize boolean fields to false. These fields determine the account type (OG, Collector, etc.).
+    account.isOG = false;
+    account.isCollector = false;
+    account.isHunter = false;
+    account.isFarmer = false;
+    account.isTrader = false;
+
+    // Initialize transaction details to zero or empty values. These fields store the transaction metadata.
+    account.logIndex = BIGINT_ZERO;
+    account.txHash = Bytes.empty();
+    account.blockNumber = BIGINT_ZERO;
+    account.blockTimestamp = BIGINT_ZERO;
   }
 
-  // Return the existing or newly created Account entity.
+  // The account entity is returned, but not saved yet.
+  // This allows the caller function to make additional changes before saving.
   return account;
 }
 
 /**
- * Updates the given Account entity based on the type of transaction and amount involved.
- * This function increments the appropriate counters (e.g., transaction count, mint count, sale count)
- * and adjusts the total amounts bought and sold, as well as the balance.
+ * This function creates a new AccountHistory entity to record a snapshot of the Account's state.
+ * AccountHistory is a log that stores historical data for each transaction.
  *
- * @param account - The Account entity to update.
- * @param transactionType - The type of transaction (TRADE, MINT, TRANSFER).
- * @param amount - The amount involved in the transaction.
- * @param isSale - Indicates whether the transaction is a sale (true) or a purchase (false).
- * @returns The updated Account entity.
+ * @param account - The current state of the Account entity.
+ * @param accountType - The type of the account (e.g., OG, Collector) at the time of this history entry.
  */
-export function updateAccountHistory(
+export function createAccountHistory(
   account: Account,
-  transactionType: TransactionType,
-  price: BigInt,
-  isSale: boolean = false
-): Account {
-  // Increment the overall transaction count for the account.
-  account.transactionCount = account.transactionCount.plus(BIGINT_ONE);
+  accountType: string
+): void {
+  // Generate a unique ID for the AccountHistory entity. This ID is a combination of the account ID and the transaction count.
+  let historyId = account.id + "-" + account.transactionCount.toString();
 
-  // Update specific counters and amounts based on the transaction type.
-  if (transactionType === TransactionType.MINT) {
-    // If the transaction is a mint, increment the mint count.
-    account.mintCount = account.mintCount.plus(BIGINT_ONE);
-  } else if (transactionType === TransactionType.TRADE && isSale) {
-    // If the transaction is a sale, increment the sale count and update the total amount sold.
-    account.saleCount = account.saleCount.plus(BIGINT_ONE);
-    account.totalAmountSold = account.totalAmountSold.plus(price);
-    // Decrease the total balance by the amount sold.
-    account.totalAmountBalance = account.totalAmountBalance.minus(price);
-  } else if (transactionType === TransactionType.TRADE && !isSale) {
-    // If the transaction is a purchase, increment the buy count and update the total amount bought.
-    account.buyCount = account.buyCount.plus(BIGINT_ONE);
-    account.totalAmountBought = account.totalAmountBought.plus(price);
-    // Increase the total balance by the amount bought.
-    account.totalAmountBalance = account.totalAmountBalance.plus(price);
-  }
+  // Create a new AccountHistory entity with the generated ID.
+  let accountHistory = new AccountHistory(historyId);
 
-  // Return the updated account entity.
-  return account;
+  // Link the AccountHistory to the corresponding Account entity.
+  accountHistory.history = account.id;
+
+  // Record the owner of the account at the time this history entry was made.
+  accountHistory.owner = Bytes.fromHexString(account.id);
+
+  // Store the transaction counts and account type from the Account entity at the time of this history entry.
+  accountHistory.mintCount = account.mintCount;
+  accountHistory.buyCount = account.buyCount;
+  accountHistory.saleCount = account.saleCount;
+  accountHistory.accountType = accountType;
+
+  // Copy the transaction metadata from the Account entity to the AccountHistory entity.
+  accountHistory.logIndex = account.logIndex;
+  accountHistory.txHash = account.txHash;
+  accountHistory.blockNumber = account.blockNumber;
+  accountHistory.blockTimestamp = account.blockTimestamp;
+
+  // Save the AccountHistory entity to the store.
+  // The history is saved immediately because it's a complete record of a past state.
+  accountHistory.save();
 }
+
+/**
+ * This function updates the transaction counts in the Account entity based on the transaction type.
+ * The function increases the appropriate counters based on whether the transaction was a MINT, TRADE, or Transfer.
+ *
+ * @param account - The Account entity to be updated.
+ * @param transactionType - The type of transaction that occurred (e.g., "MINT", "TRADE", "Transfer").
+ */
+export function updateTransactionCounts(
+  account: Account,
+  transactionType: string
+): void {
+  // If the transaction is a MINT, increment the mintCount.
+  if (transactionType == "MINT") {
+    account.mintCount = account.mintCount.plus(BIGINT_ONE);
+  }
+  // If the transaction is a TRADE, increment the buyCount.
+  else if (transactionType == "TRADE") {
+    account.buyCount = account.buyCount.plus(BIGINT_ONE);
+  }
+  // If the transaction is a Transfer, increment the transactionCount.
+  else if (transactionType == "Transfer") {
+    account.transactionCount = account.transactionCount.plus(BIGINT_ONE);
+  }
+  // Increment the overall transactionCount in any case.
+  account.transactionCount = account.transactionCount.plus(BIGINT_ONE);
+}
+
+/**
+ * This function updates the account type flags in the Account entity based on the transaction counts.
+ * The function sets flags like isOG, isCollector, etc., based on the current state of the account.
+ *
+ * @param account - The Account entity to be updated.
+ */
+export function updateAccountType(account: Account): void {
+  // Set isOG to true if the account has minted tokens but hasn't bought or sold any.
+  if (
+    account.mintCount.ge(BIGINT_ONE) &&
+    account.buyCount.equals(BIGINT_ZERO) &&
+    account.saleCount.equals(BIGINT_ZERO)
+  ) {
+    account.isOG = true;
+  }
+  // Set isCollector to true if the account has minted and bought tokens but hasn't sold any.
+  else if (
+    account.mintCount.ge(BIGINT_ONE) &&
+    account.buyCount.ge(BIGINT_ONE) &&
+    account.saleCount.equals(BIGINT_ZERO)
+  ) {
+    account.isCollector = true;
+  }
+  // Set isHunter to true if the account has minted and sold tokens but hasn't bought any.
+  else if (
+    account.mintCount.ge(BIGINT_ONE) &&
+    account.saleCount.ge(BIGINT_ONE) &&
+    account.buyCount.equals(BIGINT_ZERO)
+  ) {
+    account.isHunter = true;
+  }
+  // Set isFarmer to true if the account has minted, bought, and sold tokens.
+  else if (
+    account.mintCount.ge(BIGINT_ONE) &&
+    account.saleCount.ge(BIGINT_ONE) &&
+    account.buyCount.ge(BIGINT_ONE)
+  ) {
+    account.isFarmer = true;
+  }
+  // Set isTrader to true if the account has bought and sold tokens without minting any.
+  else if (
+    account.mintCount.equals(BIGINT_ZERO) &&
+    account.saleCount.ge(BIGINT_ONE) &&
+    account.buyCount.ge(BIGINT_ONE)
+  ) {
+    account.isTrader = true;
+  }
+}
+
+/**
+ * This helper function determines the current type of an account based on its flags.
+ * It checks the boolean fields isOG, isCollector, etc., to return the corresponding type as a string.
+ *
+ * @param account - The Account entity whose type is to be determined.
+ * @returns A string representing the current type of the account.
+ */
+export function determineAccountType(account: Account): string {
+  if (account.isOG) return "OG";
+  if (account.isCollector) return "Collector";
+  if (account.isHunter) return "Hunter";
+  if (account.isFarmer) return "Farmer";
+  if (account.isTrader) return "Trader";
+
+  // Return "Unknown" if none of the above conditions are met.
+  return "Unknown";
+}
+
 /**
  * Determines the account type based on the account's transaction history.
  * The function returns a string representing the account type, which can be OG, Collector, Hunter, Farmer, or Trader.
  *
  * @param account - The Account entity to evaluate.
  * @returns The account type as a string.
- */
+ 
 export function determineAccountType(account: Account): string {
   // Determine the account type based on the mint, buy, and sale counts.
 
@@ -148,4 +236,4 @@ export function determineAccountType(account: Account): string {
     // If none of the above conditions are met, return "Unknown" or another default type.
     return "Unknown";
   }
-}
+}*/

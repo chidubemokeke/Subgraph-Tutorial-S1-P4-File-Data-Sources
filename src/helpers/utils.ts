@@ -17,28 +17,20 @@ import {
   BIGINT_ONE,
   ZERO_ADDRESS,
   TRANSFER_EVENT_SIG,
-  ORDERS_MATCHED_SIG,
 } from "./constant";
-import { createOrUpdateAccount } from "./accountHelper";
 
 /**
- * Generates a unique identifier for a specific event in a transaction.
- * This identifier is a combination of the transaction hash and the log index,
- * ensuring that each event within a transaction can be uniquely identified.
+ * Generates a unique identifier for a Transaction entity.
+ * The identifier is based on the transaction hash and log index.
  *
- * @param event - The Ethereum event object containing transaction details.
- * @returns A unique string identifier for the event.
+ * @param txHash - The hash of the transaction.
+ * @param logIndex - The index of the log within the transaction.
+ * @returns A unique string identifier for the Transaction entity.
  */
-export function getGlobalId(event: ethereum.Event): string {
-  // Concatenate the transaction hash (converted to a hexadecimal string)
-  // with the log index (converted to a string) using a hyphen as a separator.
-  let globalId = event.transaction.hash
-    .toHexString() // Convert transaction hash to a hexadecimal string.
-    .concat("-") // Add a hyphen for separation.
-    .concat(event.logIndex.toString()); // Convert log index to a string and concatenate.
-
-  // Return the combined string as the unique identifier for the event.
-  return globalId;
+export function getTransactionId(txHash: Bytes, logIndex: BigInt): string {
+  // Convert the transaction hash to a hex string and append the log index as a string.
+  let id = txHash.toHex() + "-" + logIndex.toString();
+  return id;
 }
 
 /**
@@ -125,75 +117,42 @@ export function calculateLowestSalePrice(salePrices: BigInt[]): BigInt {
 }
 
 /**
- * Updates the ownership of a token, tracking both the previous (from) and new (to) owners.
+ * Creates or updates a CovenToken entity using the tokenId as the primary parameter.
  *
- * @param tokenId - The ID of the token being transferred.
- * @param from - The previous owner's address.
- * @param to - The new owner's address.
- * @param logIndex - The index of the log in the transaction.
- * @param transactionHash - The hash of the transaction.
- * @param blockNumber - The block number of the transaction.
- * @param timestamp - The timestamp of the block.
+ * @param tokenId - The unique ID of the token being transferred.
  */
-export function updateTokenOwner(
-  tokenId: BigInt,
-  from: Address,
-  to: Address,
-  logIndex: BigInt,
-  txHash: Bytes,
-  blockNumber: BigInt,
-  blockTimestamp: BigInt
-): void {
-  // Load the CovenToken entity using the tokenId, converting it to a hex string as the ID.
-  let token = CovenToken.load(tokenId.toHex());
+export function createOrUpdateCovenToken(tokenId: BigInt): CovenToken {
+  // Convert the tokenId to a hex string to use as the ID for the CovenToken entity.
+  let id = tokenId.toHex();
 
-  // If the token does not exist (first time being transferred), create a new CovenToken entity.
-  if (token === null) {
-    token = new CovenToken(tokenId.toHex());
-    token.tokenId = tokenId; // Set the tokenId
-    token.tokenMintCount = BIGINT_ONE; // Initialize the mint count as 1 since this is the first time it is being minted
-    token.from = from.toHex();
-    token.to = to.toHex();
-    token.logIndex = logIndex;
-    token.txHash = txHash;
-    token.blockNumber = blockNumber;
-    token.blockTimestamp = blockTimestamp;
+  // Attempt to load an existing CovenToken entity using the generated ID.
+  let token = CovenToken.load(id);
+
+  if (token == null) {
+    // If the entity does not exist, create a new one.
+    token = new CovenToken(id);
+
+    // Set the tokenId field on the newly created entity.
+    token.tokenId = tokenId;
+
+    // Initialize the tokenMintCount to zero since this is a new entity.
+    token.tokenMintCount = BIGINT_ZERO;
+
+    // Initialize transaction-related fields with zero values.
+    token.logIndex = BIGINT_ZERO;
+    token.txHash = Bytes.empty();
+    token.blockNumber = BigInt.zero();
+    token.blockTimestamp = BigInt.zero();
+
+    // Placeholder for `from`, `to`, and `owner` fields, to be set later.
+    // token.from = ...; // To be set based on event data.
+    // token.to = ...;   // To be set based on event data.
+    // token.owner = ...; // To be set based on event data.
   }
 
-  // Check if the 'from' address is not the zero address (indicating a transfer)
-  if (from !== ZERO_ADDRESS) {
-    let fromAccount = createOrUpdateAccount(
-      from,
-      logIndex,
-      txHash,
-      blockNumber,
-      blockTimestamp
-    );
-    fromAccount.save();
-  }
-
-  // Assign the new owner and ensure 'to' is not null
-  if (to !== ZERO_ADDRESS) {
-    token.owner = to;
-  } else {
-    log.warning(
-      "The 'to' address is the zero address, indicating a possible burn or invalid transfer.",
-      []
-    );
-    return; // Early exit if 'to' is zero address
-  }
-
-  // Save the updated CovenToken entity
+  // Save the entity to the store.
   token.save();
-
-  let toAccount = createOrUpdateAccount(
-    to,
-    logIndex,
-    txHash,
-    blockNumber,
-    blockTimestamp
-  );
-  toAccount.save();
+  return token as CovenToken;
 }
 
 export function getTokenIdFromReceipt(event: ethereum.Event): BigInt | null {

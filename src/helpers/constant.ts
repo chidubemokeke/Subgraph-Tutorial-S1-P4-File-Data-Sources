@@ -29,10 +29,9 @@ export const OPENSEA_ADDRESS = Bytes.fromUTF8(
   "0x7f268357A8c2552623316e2562D90e642bB538E5"
 );
 
-// Signature of the OrdersMatched event
-export const ORDERS_MATCHED_SIG = crypto.keccak256(
+export const ordersMatchedSig = crypto.keccak256(
   ByteArray.fromUTF8(
-    "OrdersMatched(bytes32,address,address,uint256,uint256,bytes32)"
+    "OrdersMatched(bytes32,bytes32,address,address,uint256,bytes32)"
   )
 );
 
