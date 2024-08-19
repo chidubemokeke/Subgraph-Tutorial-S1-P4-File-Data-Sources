@@ -1,6 +1,12 @@
-import { BigDecimal, BigInt, Bytes } from "@graphprotocol/graph-ts";
+import {
+  BigDecimal,
+  BigInt,
+  Bytes,
+  ethereum,
+  log,
+} from "@graphprotocol/graph-ts";
 import { CovenToken } from "../../generated/schema";
-import { BIGINT_ZERO, BIGDECIMAL_ZERO } from "./constant";
+import { BIGINT_ZERO, BIGDECIMAL_ZERO, TRANSFER_EVENT_SIG } from "./constant";
 
 /**
  * Generates a unique identifier for a Transaction entity.
@@ -131,6 +137,98 @@ export function createOrUpdateCovenToken(tokenId: BigInt): CovenToken {
   // Save the entity to the store.
   token.save();
   return token as CovenToken;
+}
+
+/**
+ * Extracts the tokenId from the event logs associated with a specific Ethereum event.
+ *
+ * This function processes the logs of an Ethereum event to locate and extract the tokenId
+ * from a Transfer event. It verifies that the log is from the specified token contract
+ * and that it contains valid tokenId information.
+ *
+ * @param event - The Ethereum event object containing the logs from which to extract the tokenId.
+ * @param tokenContract - The address of the token contract to verify against.
+ * @returns The extracted tokenId if found, otherwise null.
+ */
+export function extractTokenId(
+  event: ethereum.Event,
+  tokenContract: string
+): BigInt | null {
+  // Step 1: Check if the event receipt contains logs.
+  // If no logs are found, log a warning and return null.
+  if (!event.receipt || event.receipt.logs.length === 0) {
+    log.warning("[extractTokenId] No logs found in event receipt", []);
+    return null;
+  }
+
+  // Step 2: Extract logs from the event receipt.
+  // Retrieve the list of logs associated with the event.
+  const logs = event.receipt!.logs;
+
+  // Step 3: Find the log index of the OrdersMatched event.
+  // Determine the index of the log that corresponds to the OrdersMatched event.
+  const ordersMatchedLogIndex = event.logIndex;
+  let targetLogIndex = -1;
+
+  // Loop through the logs to find the log preceding the OrdersMatched event.
+  for (let i = 0; i < logs.length; i++) {
+    // Compare each log index with the OrdersMatched event log index.
+    if (logs[i].logIndex.equals(ordersMatchedLogIndex)) {
+      // Set the target index to the log immediately before the OrdersMatched event.
+      targetLogIndex = i - 1;
+      break;
+    }
+  }
+
+  // Step 4: Validate the target log index.
+  // Ensure that the target log index is within valid bounds.
+  if (targetLogIndex < 0 || targetLogIndex >= logs.length) {
+    log.warning(
+      "[extractTokenId] OrdersMatched event log index out of bounds",
+      []
+    );
+    return null;
+  }
+
+  // Step 5: Extract the token log using the target log index.
+  // Retrieve the log that contains the tokenId data.
+  const tokenLog = logs[targetLogIndex];
+  const topics = tokenLog.topics;
+
+  // Step 6: Verify if the log corresponds to a Transfer event.
+  // Check the topics to determine if this log is for a Transfer event.
+  if (topics.length > 0 && topics[0].equals(TRANSFER_EVENT_SIG)) {
+    // Decode the 'from' and 'to' addresses from the log topics.
+    const from = ethereum
+      .decode("address", topics[1])!
+      .toAddress()
+      .toHexString();
+    const to = ethereum.decode("address", topics[2])!.toAddress().toHexString();
+
+    // Step 7: Verify that the log is from the specified token contract.
+    // Ensure that the log's contract address matches the provided token contract address.
+    if (tokenLog.address.toHexString() === tokenContract) {
+      // Decode the tokenId from the log data.
+      const dataValue = ethereum.decode("uint256", tokenLog.data);
+      if (dataValue) {
+        const tokenId = dataValue.toBigInt();
+
+        // Step 8: Ensure tokenId is valid before returning.
+        // Ensure that the tokenId is not null before proceeding.
+        if (tokenId) {
+          // Create or update the CovenToken entity with the new tokenId.
+          // The tokenId is valid, so we call createOrUpdateCovenToken to handle it.
+          createOrUpdateCovenToken(tokenId);
+          return tokenId;
+        }
+      }
+    }
+  }
+
+  // Step 9: Log a warning if tokenId extraction fails.
+  // If the function reaches this point, it means the extraction was unsuccessful.
+  log.warning("[extractTokenId] TokenId extraction failed", []);
+  return null;
 }
 
 /*export function getTokenIdFromReceipt(event: ethereum.Event): BigInt | null {

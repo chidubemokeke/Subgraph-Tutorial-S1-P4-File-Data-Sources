@@ -1,27 +1,19 @@
-import { BigInt, log } from "@graphprotocol/graph-ts";
 import { OrdersMatched as OrdersMatchedEvent } from "../../generated/Opensea/Opensea";
 import {
   loadOrCreateAccount,
   createAccountHistory,
   updateTransactionCounts,
   updateAccountType,
-  determineAccountType,
 } from "../helpers/accountHelper";
 import {
   calculateAverageSalePrice,
   calculateHighestSalePrice,
   calculateLowestSalePrice,
   createOrUpdateCovenToken,
+  extractTokenId,
 } from "../helpers/utils";
 import { createOrUpdateTransaction } from "../helpers/transactionHelper";
-import { BIGINT_ONE, BIGINT_ZERO } from "../helpers/constant";
-
-// Define the enum with the three transaction types
-export enum TransactionType {
-  TRADE, // Represents a sale transaction where an NFT is sold
-  MINT, // Represents a mint transaction where a new NFT is created
-  TRANSFER, // Represents when an NFT is transferred without being sold on OpenSea
-}
+import { BIGINT_ONE, CRYPTOCOVEN_ADDRESS } from "../helpers/constant";
 
 /**
  * Handles OrdersMatched events from the OpenSea smart contract.
@@ -36,79 +28,57 @@ export enum TransactionType {
  * @param event - The OrdersMatched event object containing information about the order match.
  */
 export function handleOpenSea(event: OrdersMatchedEvent): void {
-  // Create or update the Transaction entity based on the event's transaction details.
-  // This function generates or updates a Transaction record to log the sale, capturing key details like transaction hash, log index, block number, and timestamp.
+  // Step 1: Create or update the Transaction entity based on the event's transaction details.
+  // This function either creates a new Transaction entity or updates an existing one, capturing
+  // details like the transaction hash, log index, block number, and timestamp.
+
+  let buyerAccount = loadOrCreateAccount(event.params.taker);
+  let sellerAccount = loadOrCreateAccount(event.params.maker);
   let transaction = createOrUpdateTransaction(event);
 
-  // Set the transaction type to TRADE (sale) for OrdersMatched events.
-  // OrdersMatched indicates that an NFT sale occurred, so the transaction type should be set to TRADE.
+  // Step 2: Set the transaction type to TRADE (sale) for OrdersMatched events.
+  // The OrdersMatched event signifies a successful sale of an NFT, so we set the transaction type to TRADE.
   transaction.transactionType = "TRADE";
 
-  // Retrieve the transaction receipt to access additional logs and details.
-  // Transaction receipts contain logs that provide more context about the transaction, including events like OrdersMatched.
-  let logs = event.receipt!.logs;
+  // Step 3: Retrieve the transaction receipt to access additional logs and details.
+  // We need to extract the tokenId from the logs associated with the OrdersMatched event.
+  let tokenId = extractTokenId(event, CRYPTOCOVEN_ADDRESS);
 
-  // Find the log index of the OrdersMatched event.
-  // This helps in identifying the position of the OrdersMatched event within the logs.
-  let ordersMatchedLogIndex = event.logIndex;
-
-  // Determine the index of the log just before the OrdersMatched event in the logs array.
-  // The log just before the OrdersMatched event is expected to contain the tokenId, so it's important to find this index to extract the tokenId.
-  let targetLogIndex = -1;
-  for (let i = 0; i < logs.length; i++) {
-    if (logs[i].logIndex.equals(ordersMatchedLogIndex)) {
-      targetLogIndex = i - 1; // Set the index of the previous log.
-      break;
-    }
-  }
-
-  // Validate the log index to ensure it's within bounds.
-  // This check prevents errors if the log index is out of bounds.
-  if (targetLogIndex < 0 || targetLogIndex >= logs.length) {
-    log.warning(
-      "[handleOpenSea] OrdersMatched event log index out of bounds",
-      []
-    );
-    return;
-  }
-
-  // Extract the tokenId from the logs preceding the OrdersMatched event.
-  // The tokenId is expected to be present in the logs before the OrdersMatched event.
-  let tokenId: BigInt = BIGINT_ZERO;
-  const tokenLog = logs[targetLogIndex];
-  const topics = tokenLog.topics;
-
-  // Assuming tokenId is passed as a topic in the log.
-  // TokenId extraction logic depends on the structure of the log topics. Adjust if necessary based on actual log data.
-  if (topics.length > 1) {
-    tokenId = BigInt.fromString(topics[1].toHexString()); // Extract tokenId from log topics.
-  }
-
-  // If tokenId is valid, create or update the CovenToken entity.
-  // Update the token's ownership to reflect the new owner as indicated by the OrdersMatched event.
-  if (!tokenId.equals(BIGINT_ZERO)) {
+  // Step 4: Check if the tokenId is valid before proceeding.
+  // Ensure the tokenId is not null or undefined before using it.
+  if (tokenId) {
+    // Step 5: Create or update the CovenToken entity.
+    // This function creates or updates the CovenToken entity with the specified tokenId.
     let token = createOrUpdateCovenToken(tokenId);
-    token.owner = event.params.taker; // Update the token's owner to the 'to' address from the OrdersMatched event.
-    token.save(); // Save the updated token entity.
-  } else {
-    log.warning("[handleOpenSea] TokenId extraction failed", []);
+
+    // Step 6: Set the new owner of the token.
+    // Update the CovenToken entity to reflect the new owner, which is the 'taker' address from the event.
+    token.owner = event.params.taker;
+
+    // Save the updated CovenToken entity.
+    token.save();
+
+    // Step 7: Update the Transaction entity with the tokenId as the referenceId.
+    // The referenceId field in the Transaction entity is set to the tokenId, linking the transaction to the specific token.
+    transaction.referenceId = tokenId.toHex();
+
+    // Save the updated Transaction entity with the new referenceId.
+    transaction.save();
   }
 
+  // Step 8: Calculate various statistics related to the sale.
+  // Extract the sale price from the event and update the transaction statistics accordingly.
   let salePrice = event.params.price;
   let previousHighestSalePrice = transaction.highestSalePrice;
   let previousLowestSalePrice = transaction.lowestSalePrice;
 
-  // Step 8: Calculate various statistics related to the sale, such as average, highest, and lowest prices
-  let totalSalesVolume = salePrice.times(transaction.totalNFTsSold); // Calculate total sales volume
+  // Calculate the total sales volume based on the sale price and the number of NFTs sold.
+  let totalSalesVolume = salePrice.times(transaction.totalNFTsSold);
 
   // Update transaction fields based on the OrdersMatched event.
-  transaction.account = transaction.id;
-  transaction.referenceId = tokenId.toHex();
-  transaction.totalSalesCount = BIGINT_ONE;
-  // Set fields like totalNFTsSold and totalSalesVolume to reflect the sale.
   transaction.nftSalePrice = salePrice;
-  transaction.totalNFTsSold = BIGINT_ONE; // Increment as needed based on actual data.
-  transaction.totalSalesVolume = totalSalesVolume; // Example: Adjust as needed based on actual data.
+  transaction.totalNFTsSold = BIGINT_ONE; // Set to one NFT sold in this transaction (adjust if needed)
+  transaction.totalSalesVolume = totalSalesVolume; // Set total sales volume
   transaction.highestSalePrice = calculateHighestSalePrice(
     salePrice,
     previousHighestSalePrice
@@ -126,15 +96,14 @@ export function handleOpenSea(event: OrdersMatchedEvent): void {
   transaction.blockNumber = event.block.number;
   transaction.blockTimestamp = event.block.timestamp;
 
-  transaction.save(); // Save the updated transaction entity.
+  // Save the updated Transaction entity with all the updated statistics and details.
+  transaction.save();
 
-  // Load or create Account entities for the buyer and seller involved in the transaction.
-  // Ensure that both accounts exist or are created, as they are affected by the transaction.
-  let buyerAccount = loadOrCreateAccount(event.params.taker);
-  let sellerAccount = loadOrCreateAccount(event.params.maker);
+  // Step 9: Load or create Account entities for the buyer and seller involved in the transaction.
+  // Ensure that both the buyer and seller accounts exist or are created if they do not already exist.
 
-  // Initialize or update transaction details for both accounts.
-  // This ensures that transaction details such as log index, transaction hash, block number, and timestamp are recorded for both the buyer and seller.
+  // Step 10: Initialize or update transaction details for both accounts.
+  // Set transaction details such as log index, transaction hash, block number, and timestamp for both the buyer and seller.
   buyerAccount.logIndex = event.logIndex;
   buyerAccount.txHash = event.transaction.hash;
   buyerAccount.blockNumber = event.block.number;
@@ -145,21 +114,20 @@ export function handleOpenSea(event: OrdersMatchedEvent): void {
   sellerAccount.blockNumber = event.block.number;
   sellerAccount.blockTimestamp = event.block.timestamp;
 
-  // Update transaction counts for both buyer and seller.
-  // Since this is a sale, both accounts should be updated with a TRADE transaction count.
+  // Step 11: Update transaction counts for both buyer and seller.
+  // Increment transaction counts for both buyer and seller since this event is a sale (TRADE).
   updateTransactionCounts(buyerAccount, "TRADE");
   updateTransactionCounts(sellerAccount, "TRADE");
 
-  // Update account types and histories for both buyer and seller.
-  // This step ensures that account types are accurate and that transaction history is recorded.
+  // Step 12: Update account types and histories for both buyer and seller.
+  // Update the account types and transaction history for both accounts to reflect their new status and activities.
   updateAccountType(buyerAccount);
   updateAccountType(sellerAccount);
 
-  createAccountHistory(buyerAccount, determineAccountType(buyerAccount));
-  createAccountHistory(sellerAccount, determineAccountType(sellerAccount));
+  createAccountHistory(buyerAccount);
+  createAccountHistory(sellerAccount);
 
-  // Save the updated account entities.
-  // Persist all changes to the buyer and seller accounts to reflect the latest transaction details.
+  // Save the updated account entities to persist changes.
   buyerAccount.save();
   sellerAccount.save();
 }

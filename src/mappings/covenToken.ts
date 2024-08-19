@@ -1,27 +1,13 @@
-import {
-  BigInt,
-  ByteArray,
-  ethereum,
-  crypto,
-  log,
-} from "@graphprotocol/graph-ts";
 import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
 import {
   loadOrCreateAccount,
   createAccountHistory,
   updateTransactionCounts,
   updateAccountType,
-  determineAccountType,
 } from "../helpers/accountHelper";
 import { createOrUpdateCovenToken } from "../helpers/utils";
-import { ordersMatchedSig, ZERO_ADDRESS } from "../helpers/constant";
-
-// Define the enum with the three transaction types
-export enum TransactionType {
-  TRADE, // Represents a sale transaction where an NFT is sold
-  MINT, // Represents a mint transaction where a new NFT is created
-  TRANSFER, // Represents when an NFT is transferred without being sold on OpenSea
-}
+import { ZERO_ADDRESS } from "../helpers/constant";
+import { processTransactionReceipt } from "../helpers/transactionHelper";
 
 /**
  * Handles Transfer events from the smart contract.
@@ -76,85 +62,30 @@ export function handleTransfer(event: TransferEvent): void {
     // Mints are treated as a special type of transaction where new tokens are created.
     updateTransactionCounts(toAccount, "MINT");
   } else {
-    // If it's not a mint, handle it as a transfer or sale.
+    // For non-mint transactions, determine if the transaction is a sale or a transfer.
 
-    // Check if the event has a receipt (i.e., if there are any logs associated with this event).
-    if (!event.receipt) {
-      log.warning("[handleTransfer][{}] has no event.receipt", [
-        event.transaction.hash.toHexString(),
-      ]);
+    // Use the processTransactionReceipt function to check for an OrdersMatched event.
+    let isOrdersMatched = processTransactionReceipt(event);
 
-      // No receipt available; handle by updating account types and histories only.
-      // This ensures that even without additional log data, the accounts are correctly updated.
-      updateAccountType(fromAccount);
-      updateAccountType(toAccount);
-
-      createAccountHistory(fromAccount, determineAccountType(fromAccount));
-      createAccountHistory(toAccount, determineAccountType(toAccount));
-
-      // Save the updated account entities.
-      fromAccount.save();
-      toAccount.save();
-
-      return; // Exit early as there's no additional log data to process.
-    }
-
-    // Retrieve logs from the event receipt.
-    // This allows us to inspect additional events that may be part of the same transaction.
-    const currentEventLogIndex = event.logIndex; // Index of the current Transfer event log.
-    const logs = event.receipt!.logs; // Array of logs associated with the transaction.
-
-    // Variable to track the position of the first log after the current Transfer event.
-    let foundIndex = +1;
-    let isOrdersMatched = false; // Flag to indicate if an OrdersMatched event is detected.
-
-    // Loop through logs to find the index of the first log after the current Transfer event.
-    for (let i = 0; i < logs.length; i++) {
-      const currLog = logs[i];
-
-      // Identify the position of the current Transfer event log within the logs array.
-      if (currLog.logIndex.equals(currentEventLogIndex)) {
-        foundIndex = i;
-        break; // Stop looping once the index of the current Transfer event is found.
-      }
-    }
-
-    // Check if there are sufficient logs after the Transfer event to potentially find the OrdersMatched event.
-    // The +5 offset is based on the assumption that the OrdersMatched event may follow after the Transfer event.
-    if (foundIndex >= 0 && foundIndex + 5 < logs.length) {
-      const nextLog = logs[foundIndex + 5]; // Cast to 'i32' to ensure the correct type is used.
-      const topic0Sig = nextLog.topics[0]; // First topic of the next log.
-
-      // Check if the next log contains the OrdersMatched signature.
-      if (topic0Sig.equals(ordersMatchedSig)) {
-        isOrdersMatched = true; // Flag indicating that OrdersMatched event is found.
-      }
-    }
-
-    // Determine the type of transaction based on whether OrdersMatched is found.
     if (isOrdersMatched) {
-      // If OrdersMatched event is found, update transaction counts as a 'SALE' for both accounts.
-      // Sales involve the exchange of tokens for some value and are treated differently than transfers.
+      // If OrdersMatched event is found, update transaction counts as a 'TRADE' for both accounts.
       updateTransactionCounts(fromAccount, "TRADE");
       updateTransactionCounts(toAccount, "TRADE");
     } else {
       // If OrdersMatched event is not found, update transaction counts as a 'TRANSFER'.
-      // Regular transfers involve the movement of tokens without additional value exchange.
       updateTransactionCounts(fromAccount, "TRANSFER");
       updateTransactionCounts(toAccount, "TRANSFER");
     }
   }
 
   // Update account types and histories.
-  // This step ensures that account types are accurate and that transaction history is recorded.
   updateAccountType(fromAccount);
   updateAccountType(toAccount);
 
-  createAccountHistory(fromAccount, determineAccountType(fromAccount));
-  createAccountHistory(toAccount, determineAccountType(toAccount));
+  createAccountHistory(fromAccount);
+  createAccountHistory(toAccount);
 
   // Save the updated account entities.
-  // This step ensures that the accounts are stored with all the updated information.
   fromAccount.save();
   toAccount.save();
 }

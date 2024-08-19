@@ -2,12 +2,6 @@ import { Bytes } from "@graphprotocol/graph-ts";
 import { Account, AccountHistory } from "../../generated/schema";
 import { BIGINT_ONE, BIGINT_ZERO } from "./constant";
 
-// Define the enum with the three transaction types
-export enum TransactionType {
-  TRADE, // Represents a sale transaction where an NFT is sold
-  MINT, // Represents a mint transaction where a new NFT is created
-  TRANSFER, // Represents when an NFT is transferred without being sold on OpenSea
-}
 /**
  * This function is responsible for loading an Account entity from the store using its ID.
  * If the Account doesn't exist, it creates a new Account entity and initializes its fields.
@@ -50,7 +44,7 @@ export function loadOrCreateAccount(accountId: Bytes): Account {
 
   // The account entity is returned, but not saved yet.
   // This allows the caller function to make additional changes before saving.
-  return account;
+  return account as Account;
 }
 
 /**
@@ -60,10 +54,7 @@ export function loadOrCreateAccount(accountId: Bytes): Account {
  * @param account - The current state of the Account entity.
  * @param accountType - The type of the account (e.g., OG, Collector) at the time of this history entry.
  */
-export function createAccountHistory(
-  account: Account,
-  accountType: string
-): void {
+export function createAccountHistory(account: Account): void {
   // Generate a unique ID for the AccountHistory entity. This ID is a combination of the account ID and the transaction count.
   let historyId = account.id + "-" + account.transactionCount.toString();
 
@@ -80,7 +71,6 @@ export function createAccountHistory(
   accountHistory.mintCount = account.mintCount;
   accountHistory.buyCount = account.buyCount;
   accountHistory.saleCount = account.saleCount;
-  accountHistory.accountType = accountType;
 
   // Copy the transaction metadata from the Account entity to the AccountHistory entity.
   accountHistory.logIndex = account.logIndex;
@@ -125,6 +115,7 @@ export function updateTransactionCounts(
 
   // Increment the overall transactionCount in any case.
   account.transactionCount = account.transactionCount.plus(BIGINT_ONE);
+  account.save;
 }
 
 /**
@@ -174,6 +165,7 @@ export function updateAccountType(account: Account): void {
   ) {
     account.isTrader = true;
   }
+  return;
 }
 
 /**
@@ -182,7 +174,7 @@ export function updateAccountType(account: Account): void {
  *
  * @param account - The Account entity whose type is to be determined.
  * @returns A string representing the current type of the account.
- */
+
 export function determineAccountType(account: Account): string {
   if (account.isOG) return "OG";
   if (account.isCollector) return "Collector";

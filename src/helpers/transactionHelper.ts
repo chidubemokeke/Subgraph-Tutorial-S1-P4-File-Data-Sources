@@ -1,6 +1,6 @@
-import { ethereum, Bytes } from "@graphprotocol/graph-ts";
+import { ethereum, Bytes, log } from "@graphprotocol/graph-ts";
 import { Transaction } from "../../generated/schema";
-import { BIGINT_ZERO, BIGDECIMAL_ZERO } from "./constant";
+import { BIGINT_ZERO, BIGDECIMAL_ZERO, ordersMatchedSig } from "./constant";
 import { getTransactionId } from "./utils";
 
 /**
@@ -43,6 +43,66 @@ export function createOrUpdateTransaction(event: ethereum.Event): Transaction {
   transaction.save();
 
   return transaction as Transaction;
+}
+
+/**
+ * Processes the transaction receipt associated with the given event to determine if
+ * an `OrdersMatched` event occurs after the current event within the same transaction.
+ *
+ * @param event - The Ethereum event to be processed.
+ * @returns A boolean indicating whether an `OrdersMatched` event is found after the current event.
+ */
+export function processTransactionReceipt(event: ethereum.Event): boolean {
+  // Define the keccak256 hash of the `OrdersMatched` event signature.
+  const ordersMatched = ordersMatchedSig;
+
+  // Check if the event has an associated transaction receipt.
+  if (!event.receipt) {
+    log.warning("[handleTransfer][{}] has no event.receipt", [
+      event.transaction.hash.toHexString(),
+    ]);
+
+    // Exit early if no receipt is available since there are no logs to process.
+    return false;
+  }
+
+  // Get the current event's log index to identify its position within the transaction logs.
+  const currentEventLogIndex = event.logIndex;
+
+  // Retrieve all logs associated with the transaction from the receipt.
+  const logs = event.receipt!.logs;
+
+  // Initialize a variable to store the index of the current event log within the logs array.
+  let foundIndex = -1;
+
+  // Iterate through the logs to find the index of the current event's log.
+  for (let i = 0; i < logs.length; i++) {
+    const currLog = logs[i];
+
+    // If the log index matches the current event's log index, store the index and break the loop.
+    if (currLog.logIndex.equals(currentEventLogIndex)) {
+      foundIndex = i;
+      break;
+    }
+  }
+
+  // Check if we found the current event's log and if there are at least 5 logs after it.
+  // The assumption is that the `OrdersMatched` event may follow the current event after 5 logs.
+  if (foundIndex >= 0 && foundIndex + 5 < logs.length) {
+    // Retrieve the log that occurs 5 positions after the current event's log.
+    const nextLog = logs[foundIndex + 5];
+    // Extract the first topic (topic0) from the next log, which contains the event signature.
+    const topic0Sig = nextLog.topics[0];
+
+    // Compare the topic0 of the next log with the `OrdersMatched` signature.
+    if (topic0Sig.equals(ordersMatchedSig)) {
+      // If they match, the `OrdersMatched` event is found.
+      return true;
+    }
+  }
+
+  // If no `OrdersMatched` event is found after the current event, return false.
+  return false;
 }
 
 /**
