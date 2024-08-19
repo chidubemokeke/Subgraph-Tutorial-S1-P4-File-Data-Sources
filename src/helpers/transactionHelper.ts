@@ -28,7 +28,7 @@ export function createOrUpdateTransaction(event: ethereum.Event): Transaction {
 
   // Additional fields can be initialized or updated here
   transaction.account = transaction.id;
-  transaction.referenceId = BIGINT_ZERO;
+  transaction.referenceId = "";
   transaction.buyer = Bytes.empty();
   transaction.seller = Bytes.empty();
   transaction.nftSalePrice = BIGINT_ZERO;
@@ -42,7 +42,7 @@ export function createOrUpdateTransaction(event: ethereum.Event): Transaction {
   // Save the Transaction entity.
   transaction.save();
 
-  return transaction;
+  return transaction as Transaction;
 }
 
 /**

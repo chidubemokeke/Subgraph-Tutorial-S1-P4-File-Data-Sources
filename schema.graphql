@@ -84,7 +84,7 @@ type CovenToken @entity {
   owner: Bytes!
 
   "The ID of the token"
-  tokenId: BigInt!
+  tokenId: String!
 
   "Total number of times NFT has been minted"
   tokenMintCount: BigInt!
@@ -103,7 +103,7 @@ type Transaction @entity {
   account: Account!
 
   "Reference to the corresponding event/transaction in the CryptoCoven contract (TokenID)"
-  referenceId: BigInt!
+  referenceId: String!
 
   "Transaction type defined by the enum, Trade/Mint"
   transactionType: TransactionType!

@@ -1,23 +1,6 @@
-import {
-  Address,
-  BigDecimal,
-  BigInt,
-  ByteArray,
-  Bytes,
-  ethereum,
-  log,
-  crypto,
-} from "@graphprotocol/graph-ts";
+import { BigDecimal, BigInt, Bytes } from "@graphprotocol/graph-ts";
 import { CovenToken } from "../../generated/schema";
-import {
-  OPENSEA_ADDRESS,
-  ordersMatchedEventSignature,
-  BIGINT_ZERO,
-  BIGDECIMAL_ZERO,
-  BIGINT_ONE,
-  ZERO_ADDRESS,
-  TRANSFER_EVENT_SIG,
-} from "./constant";
+import { BIGINT_ZERO, BIGDECIMAL_ZERO } from "./constant";
 
 /**
  * Generates a unique identifier for a Transaction entity.
@@ -59,63 +42,58 @@ export function calculateAverageSalePrice(
 }
 
 /**
- * Determines the highest sale price from a list of sale prices.
+ * Function to calculate the highest sale price.
  *
- * @param salePrices - An array of sale prices.
- * @returns The highest sale price as a BigInt.
+ * This function checks whether the current sale price is higher than the previous
+ * highest sale price. If it is, it updates the highest sale price. If this is the
+ * first transaction and there is no previous highest sale price (i.e., `previousHighestPrice` is null),
+ * the current sale price is set as the highest sale price.
+ *
+ * @param currentPrice - The price of the current sale.
+ * @param previousHighestPrice - The previously recorded highest sale price, or null if this is the first transaction.
+ * @returns - The updated highest sale price.
  */
-export function calculateHighestSalePrice(salePrices: BigInt[]): BigInt {
-  // Check if there are any sale prices in the array
-  if (salePrices.length === 0) {
-    // If no sale prices, return 0 as the highest price
-    return BIGINT_ZERO;
+export function calculateHighestSalePrice(
+  currentPrice: BigInt,
+  previousHighestPrice: BigInt | null
+): BigInt {
+  // If there's no previous highest sale price (i.e., first transaction), set the current sale price as the highest.
+  if (previousHighestPrice == null) {
+    return currentPrice;
   }
-
-  // Initialize the highest price with a starting value of 0
-  let highestPrice = BIGINT_ZERO;
-
-  // Loop through the list of sale prices to find the highest one
-  for (let i = 0; i < salePrices.length; i++) {
-    // Check if the current sale price is greater than the current highest price
-    if (salePrices[i].gt(highestPrice)) {
-      // If it is, update the highest price to the current sale price
-      highestPrice = salePrices[i];
-    }
-  }
-
-  // Return the highest sale price found in the array
-  return highestPrice;
+  // Compare the current sale price with the previous highest sale price and return the higher value.
+  // If the current sale price is higher, it becomes the new highest sale price.
+  return currentPrice.gt(previousHighestPrice)
+    ? currentPrice
+    : previousHighestPrice;
 }
 
 /**
- * Determines the lowest sale price from a list of sale prices.
+ * Function to calculate the lowest sale price.
  *
- * @param salePrices - An array of sale prices.
- * @returns The lowest sale price as a BigInt.
+ * This function checks whether the current sale price is lower than the previous
+ * lowest sale price. If it is, it updates the lowest sale price. If this is the
+ * first transaction and there is no previous lowest sale price (i.e., `previousLowestPrice` is null),
+ * the current sale price is set as the lowest sale price.
+ *
+ * @param currentPrice - The price of the current sale.
+ * @param previousLowestPrice - The previously recorded lowest sale price, or null if this is the first transaction.
+ * @returns - The updated lowest sale price.
  */
-export function calculateLowestSalePrice(salePrices: BigInt[]): BigInt {
-  // Check if there are any sale prices in the array
-  if (salePrices.length === 0) {
-    // If no sale prices, return 0 as the lowest price
-    return BIGINT_ZERO;
+export function calculateLowestSalePrice(
+  currentPrice: BigInt,
+  previousLowestPrice: BigInt | null
+): BigInt {
+  // If there's no previous lowest sale price (i.e., first transaction), set the current sale price as the lowest.
+  if (previousLowestPrice == null) {
+    return currentPrice;
   }
-
-  // Initialize the lowest price with the first sale price in the array
-  let lowestPrice = salePrices[0];
-
-  // Loop through the rest of the sale prices to find the lowest one
-  for (let i = 1; i < salePrices.length; i++) {
-    // Check if the current sale price is less than the current lowest price
-    if (salePrices[i].lt(lowestPrice)) {
-      // If it is, update the lowest price to the current sale price
-      lowestPrice = salePrices[i];
-    }
-  }
-
-  // Return the lowest sale price found in the array
-  return lowestPrice;
+  // Compare the current sale price with the previous lowest sale price and return the lower value.
+  // If the current sale price is lower, it becomes the new lowest sale price.
+  return currentPrice.lt(previousLowestPrice)
+    ? currentPrice
+    : previousLowestPrice;
 }
-
 /**
  * Creates or updates a CovenToken entity using the tokenId as the primary parameter.
  *
@@ -133,7 +111,7 @@ export function createOrUpdateCovenToken(tokenId: BigInt): CovenToken {
     token = new CovenToken(id);
 
     // Set the tokenId field on the newly created entity.
-    token.tokenId = tokenId;
+    token.tokenId = tokenId.toHex();
 
     // Initialize the tokenMintCount to zero since this is a new entity.
     token.tokenMintCount = BIGINT_ZERO;
@@ -155,7 +133,7 @@ export function createOrUpdateCovenToken(tokenId: BigInt): CovenToken {
   return token as CovenToken;
 }
 
-export function getTokenIdFromReceipt(event: ethereum.Event): BigInt | null {
+/*export function getTokenIdFromReceipt(event: ethereum.Event): BigInt | null {
   // Ensure the event has a receipt
   if (!event.receipt) {
     log.warning("[getTokenIdFromReceipt][{}] has no event.receipt", [
@@ -257,7 +235,7 @@ export function getTokenIdFromReceipt(event: ethereum.Event): BigInt | null {
  *
  * @param event - The Ethereum event containing the transaction receipt.
  * @returns An array of BigInt representing the token IDs of NFTs involved in the transaction, or an empty array if not found.
- */
+ 
 export function extractNFTsFromLogs(event: ethereum.Event): Array<BigInt> {
   // Ensure the event has a receipt
   if (!event.receipt) {
@@ -322,4 +300,4 @@ export function extractNFTsFromLogs(event: ethereum.Event): Array<BigInt> {
 
   // Return the array of extracted NFT token IDs
   return nftTokenIds;
-}
+}*/

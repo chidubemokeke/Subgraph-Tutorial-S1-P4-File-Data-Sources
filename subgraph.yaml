@@ -50,7 +50,7 @@ dataSources:
             # Enable receipt processing to access additional data from the transaction logs to verify transaction type from logs
           receipt: true
       # Path to the TypeScript file that contains the event handler implementations
-      file: src/mappings/transactions.ts
+      file: src/mappings/covenToken.ts
 
   - kind: ethereum/contract
     name: Opensea

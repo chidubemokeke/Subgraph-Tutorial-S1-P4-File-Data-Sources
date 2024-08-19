@@ -99,23 +99,30 @@ export function createAccountHistory(
  *
  * @param account - The Account entity to be updated.
  * @param transactionType - The type of transaction that occurred (e.g., "MINT", "TRADE", "Transfer").
+ * @param isBuyer - A boolean indicating whether the account is the buyer in a TRADE transaction.
  */
 export function updateTransactionCounts(
   account: Account,
-  transactionType: string
+  transactionType: string,
+  isBuyer: boolean = false // Default to false to maintain backward compatibility
 ): void {
   // If the transaction is a MINT, increment the mintCount.
   if (transactionType == "MINT") {
     account.mintCount = account.mintCount.plus(BIGINT_ONE);
   }
-  // If the transaction is a TRADE, increment the buyCount.
+  // If the transaction is a TRADE, increment the buyCount if the account is the buyer, otherwise increment the sellCount.
   else if (transactionType == "TRADE") {
-    account.buyCount = account.buyCount.plus(BIGINT_ONE);
+    if (isBuyer) {
+      account.buyCount = account.buyCount.plus(BIGINT_ONE);
+    } else {
+      account.saleCount = account.saleCount.plus(BIGINT_ONE);
+    }
   }
   // If the transaction is a Transfer, increment the transactionCount.
   else if (transactionType == "Transfer") {
     account.transactionCount = account.transactionCount.plus(BIGINT_ONE);
   }
+
   // Increment the overall transactionCount in any case.
   account.transactionCount = account.transactionCount.plus(BIGINT_ONE);
 }

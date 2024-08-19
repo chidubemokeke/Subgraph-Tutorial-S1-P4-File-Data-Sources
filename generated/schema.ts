@@ -537,17 +537,17 @@ export class CovenToken extends Entity {
     this.set("owner", Value.fromBytes(value));
   }
 
-  get tokenId(): BigInt {
+  get tokenId(): string {
     let value = this.get("tokenId");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
-      return value.toBigInt();
+      return value.toString();
     }
   }
 
-  set tokenId(value: BigInt) {
-    this.set("tokenId", Value.fromBigInt(value));
+  set tokenId(value: string) {
+    this.set("tokenId", Value.fromString(value));
   }
 
   get tokenMintCount(): BigInt {
@@ -670,17 +670,17 @@ export class Transaction extends Entity {
     this.set("account", Value.fromString(value));
   }
 
-  get referenceId(): BigInt {
+  get referenceId(): string {
     let value = this.get("referenceId");
     if (!value || value.kind == ValueKind.NULL) {
       throw new Error("Cannot return null for a required field.");
     } else {
-      return value.toBigInt();
+      return value.toString();
     }
   }
 
-  set referenceId(value: BigInt) {
-    this.set("referenceId", Value.fromBigInt(value));
+  set referenceId(value: string) {
+    this.set("referenceId", Value.fromString(value));
   }
 
   get transactionType(): string {
