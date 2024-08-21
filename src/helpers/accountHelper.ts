@@ -44,7 +44,7 @@ export function loadOrCreateAccount(accountId: Bytes): Account {
 
   // The account entity is returned, but not saved yet.
   // This allows the caller function to make additional changes before saving.
-  return account as Account;
+  return account;
 }
 
 /**
@@ -168,12 +168,11 @@ export function updateAccountType(account: Account): void {
   return;
 }
 
-/**
- * This helper function determines the current type of an account based on its flags.
+/** This helper function determines the current type of an account based on its flags.
  * It checks the boolean fields isOG, isCollector, etc., to return the corresponding type as a string.
  *
  * @param account - The Account entity whose type is to be determined.
- * @returns A string representing the current type of the account.
+ / @returns A string representing the current type of the account. **/
 
 export function determineAccountType(account: Account): string {
   if (account.isOG) return "OG";

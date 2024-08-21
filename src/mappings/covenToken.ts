@@ -1,91 +1,110 @@
+import { log } from "@graphprotocol/graph-ts";
 import { Transfer as TransferEvent } from "../../generated/CryptoCoven/CryptoCoven";
 import {
   loadOrCreateAccount,
   createAccountHistory,
   updateTransactionCounts,
   updateAccountType,
+  determineAccountType,
 } from "../helpers/accountHelper";
-import { createOrUpdateCovenToken } from "../helpers/utils";
+import {
+  checkForOrdersMatched,
+  createOrUpdateCovenToken,
+} from "../helpers/utils";
 import { ZERO_ADDRESS } from "../helpers/constant";
-import { processTransactionReceipt } from "../helpers/transactionHelper";
+
+export @enum {
+  MINT
+  TRADE
+  TRANSFER
+}
+
 
 /**
  * Handles Transfer events from the smart contract.
  *
- * This function handles the core logic for processing token transfers. It manages
- * the creation and updating of both account and token entities, determines the type
- * of transaction (mint, transfer, or sale), and updates the transaction counts accordingly.
+ * This function manages the entire lifecycle of a token transfer event. It handles
+ * the creation and updating of account and token entities, determines the type of
+ * transaction (mint, transfer, or trade), and updates transaction counts accordingly.
  *
  * @param event - The Transfer event object containing information about the token transfer.
  */
 export function handleTransfer(event: TransferEvent): void {
-  // Load or create Account entities for the 'from' and 'to' addresses involved in the transfer.
-  // This step ensures that entities exist for both accounts involved in the transfer.
+  // Step 1: Load or create Account entities for the 'from' and 'to' addresses involved in the transfer.
+  // This ensures that both accounts exist in the subgraph, even if they haven't interacted before.
   let fromAccount = loadOrCreateAccount(event.params.from);
   let toAccount = loadOrCreateAccount(event.params.to);
 
-  // Initialize transaction details for both accounts.
-  // These details are updated to track the latest transaction associated with each account.
-  fromAccount.logIndex = event.logIndex; // Set log index for 'from' account.
-  fromAccount.txHash = event.transaction.hash; // Set transaction hash for 'from' account.
-  fromAccount.blockNumber = event.block.number; // Set block number for 'from' account.
-  fromAccount.blockTimestamp = event.block.timestamp; // Set block timestamp for 'from' account.
+  // Step 2: Initialize transaction details for both accounts.
+  // This includes setting the log index, transaction hash, block number, and timestamp
+  // to capture the most recent transaction details for these accounts.
+  fromAccount.logIndex = event.logIndex;
+  fromAccount.txHash = event.transaction.hash;
+  fromAccount.blockNumber = event.block.number;
+  fromAccount.blockTimestamp = event.block.timestamp;
 
-  toAccount.logIndex = event.logIndex; // Set log index for 'to' account.
-  toAccount.txHash = event.transaction.hash; // Set transaction hash for 'to' account.
-  toAccount.blockNumber = event.block.number; // Set block number for 'to' account.
-  toAccount.blockTimestamp = event.block.timestamp; // Set block timestamp for 'to' account.
+  toAccount.logIndex = event.logIndex;
+  toAccount.txHash = event.transaction.hash;
+  toAccount.blockNumber = event.block.number;
+  toAccount.blockTimestamp = event.block.timestamp;
 
-  // Load or create the CovenToken entity associated with this tokenId.
-  // This step ensures that the token entity is properly initialized and can be updated.
+  // Step 3: Load or create the CovenToken entity associated with this tokenId.
+  // This ensures that the token entity is properly initialized and can be updated with new data.
   let token = createOrUpdateCovenToken(event.params.tokenId);
 
-  // Update the token's fields based on the event data.
-  // These fields are crucial for tracking the token's transaction history and ownership.
-  token.logIndex = event.logIndex; // Update log index for the token.
-  token.txHash = event.transaction.hash; // Update transaction hash for the token.
-  token.blockNumber = event.block.number; // Update block number for the token.
-  token.blockTimestamp = event.block.timestamp; // Update block timestamp for the token.
-  token.owner = event.params.to; // Set the owner of the token to the 'to' address.
+  // Step 4: Update the token's fields based on the event data.
+  // The token entity is updated with the latest transaction details to ensure accurate tracking
+  // of its ownership and transaction history.
+  token.logIndex = event.logIndex;
+  token.txHash = event.transaction.hash;
+  token.blockNumber = event.block.number;
+  token.blockTimestamp = event.block.timestamp;
+  token.owner = event.params.to; // Update the owner of the token to the 'to' address.
 
-  // Determine if the transaction is a mint operation.
-  // A mint occurs when the 'from' address is empty (indicating the token is being created).
+  // Step 5: Determine if the transaction is a mint operation.
+  // A mint operation occurs when the 'from' address is the zero address, indicating that
+  // the token is being created rather than transferred.
   let isMint = event.params.from == ZERO_ADDRESS;
 
   // Save the updated CovenToken entity.
-  // This step ensures that the entity is stored with all the updated information.
+  // It's important to save the token entity after updating its fields to persist these changes.
   token.save();
 
-  // Determine transaction type and update transaction counts.
-  if (isMint) {
-    // If it's a mint, update transaction counts as 'MINT' for the recipient account.
-    // Mints are treated as a special type of transaction where new tokens are created.
+  // Step 6: Determine the transaction type using the checkForOrdersMatched function.
+  // If it's a mint, we classify the transaction as "MINT".
+  // Otherwise, we check if it's a trade by using checkForOrdersMatched function. If a trade
+  // is detected, the transaction type is set to "TRADE". If not, it's classified as a "TRANSFER".
+  let transactionType = isMint
+    ? "MINT"
+    : checkForOrdersMatched(event)
+      ? "TRADE"
+      : "TRANSFER";
+
+  // Step 7: Update transaction counts based on the determined transaction type.
+  // This step ensures that the appropriate counters are incremented based on the type of transaction.
+  if (transactionType === "MINT") {
+    // For mint transactions, we update the transaction counts for the recipient account.
     updateTransactionCounts(toAccount, "MINT");
+  } else if (transactionType === "TRADE") {
+    // For trade transactions, we update the transaction counts for both the sender and recipient accounts.
+    updateTransactionCounts(fromAccount, "TRADE");
+    updateTransactionCounts(toAccount, "TRADE");
   } else {
-    // For non-mint transactions, determine if the transaction is a sale or a transfer.
-
-    // Use the processTransactionReceipt function to check for an OrdersMatched event.
-    let isOrdersMatched = processTransactionReceipt(event);
-
-    if (isOrdersMatched) {
-      // If OrdersMatched event is found, update transaction counts as a 'TRADE' for both accounts.
-      updateTransactionCounts(fromAccount, "TRADE");
-      updateTransactionCounts(toAccount, "TRADE");
-    } else {
-      // If OrdersMatched event is not found, update transaction counts as a 'TRANSFER'.
-      updateTransactionCounts(fromAccount, "TRANSFER");
-      updateTransactionCounts(toAccount, "TRANSFER");
-    }
+    // For transfer transactions, we update the transaction counts for both the sender and recipient accounts.
+    updateTransactionCounts(fromAccount, "TRANSFER");
+    updateTransactionCounts(toAccount, "TRANSFER");
   }
 
-  // Update account types and histories.
+  // Step 8: Update account types and histories.
+  // This step involves updating the account types (e.g., whether the account is a buyer, seller, etc.)
+  // and creating account history entities to track past transactions.
+ determineAccountType(fromAccount);
+  determineAccountType(toAccount);
+
   updateAccountType(fromAccount);
   updateAccountType(toAccount);
 
+  // Creating account history records for both accounts involved in the transaction.
   createAccountHistory(fromAccount);
   createAccountHistory(toAccount);
-
-  // Save the updated account entities.
-  fromAccount.save();
-  toAccount.save();
 }

@@ -6,7 +6,12 @@ import {
   log,
 } from "@graphprotocol/graph-ts";
 import { CovenToken } from "../../generated/schema";
-import { BIGINT_ZERO, BIGDECIMAL_ZERO, TRANSFER_EVENT_SIG } from "./constant";
+import {
+  BIGINT_ZERO,
+  BIGDECIMAL_ZERO,
+  TRANSFER_EVENT_SIG,
+  ORDERS_MATCHED_EVENT_SIG,
+} from "./constant";
 
 /**
  * Generates a unique identifier for a Transaction entity.
@@ -140,95 +145,116 @@ export function createOrUpdateCovenToken(tokenId: BigInt): CovenToken {
 }
 
 /**
- * Extracts the tokenId from the event logs associated with a specific Ethereum event.
- *
- * This function processes the logs of an Ethereum event to locate and extract the tokenId
- * from a Transfer event. It verifies that the log is from the specified token contract
- * and that it contains valid tokenId information.
+ * Extracts the tokenId from an Ethereum transaction's logs by traversing through the logs
+ * and finding a Transfer event that is associated with the OrdersMatched event.
  *
  * @param event - The Ethereum event object containing the logs from which to extract the tokenId.
- * @param tokenContract - The address of the token contract to verify against.
  * @returns The extracted tokenId if found, otherwise null.
  */
-export function extractTokenId(
-  event: ethereum.Event,
-  tokenContract: string
-): BigInt | null {
-  // Step 1: Check if the event receipt contains logs.
-  // If no logs are found, log a warning and return null.
-  if (!event.receipt || event.receipt.logs.length === 0) {
-    log.warning("[extractTokenId] No logs found in event receipt", []);
+export function extractTokenIdFromLogs(event: ethereum.Event): BigInt | null {
+  // Step 1: Ensure the event's receipt exists and contains logs
+  // The receipt is an object that contains all the logs generated during the transaction.
+  // If the receipt is null or doesn't contain any logs, log a warning and return null.
+  if (!event.receipt) {
+    log.warning("[extractTokenIdFromLogs] No logs found in event receipt", []);
     return null;
   }
 
-  // Step 2: Extract logs from the event receipt.
-  // Retrieve the list of logs associated with the event.
-  const logs = event.receipt!.logs;
+  // Step 2: Extract the logs from the event receipt
+  // Logs are essentially event data generated during the execution of the transaction.
+  // They are stored as an array of log objects within the receipt.
+  const logs = event.receipt?.logs;
 
-  // Step 3: Find the log index of the OrdersMatched event.
-  // Determine the index of the log that corresponds to the OrdersMatched event.
-  const ordersMatchedLogIndex = event.logIndex;
-  let targetLogIndex = -1;
+  // Step 3: Initialize a variable to track the index of the OrdersMatched event
+  // This variable will help us identify the position of the OrdersMatched event in the logs array.
+  let ordersMatchedIndex = -1;
 
-  // Loop through the logs to find the log preceding the OrdersMatched event.
+  // Step 4: Loop through the logs to locate the OrdersMatched event
+  // Each log entry contains topics, which are indexed parameters used to identify the event type.
+  // The first topic is always the event signature, so we compare it against the OrdersMatched event signature.
   for (let i = 0; i < logs.length; i++) {
-    // Compare each log index with the OrdersMatched event log index.
-    if (logs[i].logIndex.equals(ordersMatchedLogIndex)) {
-      // Set the target index to the log immediately before the OrdersMatched event.
-      targetLogIndex = i - 1;
+    let currLog = logs[i]; // Access the log at the current index.
+
+    // Check if the first topic matches the OrdersMatched event signature
+    if (
+      currLog.topics.length > 0 &&
+      currLog.topics[0].equals(ORDERS_MATCHED_EVENT_SIG)
+    ) {
+      // If a match is found, store the index of this log entry and break out of the loop
+      ordersMatchedIndex = i;
       break;
     }
   }
 
-  // Step 4: Validate the target log index.
-  // Ensure that the target log index is within valid bounds.
-  if (targetLogIndex < 0 || targetLogIndex >= logs.length) {
-    log.warning(
-      "[extractTokenId] OrdersMatched event log index out of bounds",
-      []
-    );
-    return null;
-  }
+  // Step 5: If the OrdersMatched event was found, proceed to find the Transfer event
+  // We loop through the logs again, but this time we skip the log entry at the ordersMatchedIndex.
+  if (ordersMatchedIndex != -1) {
+    for (let i = 0; i < logs.length; i++) {
+      if (i == ordersMatchedIndex) continue; // Skip the OrdersMatched event log
 
-  // Step 5: Extract the token log using the target log index.
-  // Retrieve the log that contains the tokenId data.
-  const tokenLog = logs[targetLogIndex];
-  const topics = tokenLog.topics;
+      let currLog = logs[i]; // Access the log at the current index.
+      let topics = currLog.topics; // Extract the topics from the current log.
 
-  // Step 6: Verify if the log corresponds to a Transfer event.
-  // Check the topics to determine if this log is for a Transfer event.
-  if (topics.length > 0 && topics[0].equals(TRANSFER_EVENT_SIG)) {
-    // Decode the 'from' and 'to' addresses from the log topics.
-    const from = ethereum
-      .decode("address", topics[1])!
-      .toAddress()
-      .toHexString();
-    const to = ethereum.decode("address", topics[2])!.toAddress().toHexString();
+      // Step 6: Check if the current log is a Transfer event
+      // The Transfer event is identified by comparing the first topic to the TRANSFER_EVENT_SIG.
+      if (topics.length > 0 && topics[0].equals(TRANSFER_EVENT_SIG)) {
+        // Step 7: Decode the tokenId from the log's data field
+        // The data field of the Transfer event contains the tokenId or the amount transferred.
+        const dataValue = ethereum.decode("uint256", currLog.data);
 
-    // Step 7: Verify that the log is from the specified token contract.
-    // Ensure that the log's contract address matches the provided token contract address.
-    if (tokenLog.address.toHexString() === tokenContract) {
-      // Decode the tokenId from the log data.
-      const dataValue = ethereum.decode("uint256", tokenLog.data);
-      if (dataValue) {
-        const tokenId = dataValue.toBigInt();
+        // Step 8: Convert the decoded value to a BigInt if it exists
+        if (dataValue) {
+          const tokenId = dataValue.toBigInt();
 
-        // Step 8: Ensure tokenId is valid before returning.
-        // Ensure that the tokenId is not null before proceeding.
-        if (tokenId) {
-          // Create or update the CovenToken entity with the new tokenId.
-          // The tokenId is valid, so we call createOrUpdateCovenToken to handle it.
-          createOrUpdateCovenToken(tokenId);
-          return tokenId;
+          // If tokenId is valid, return it
+          if (tokenId) {
+            return tokenId;
+          }
         }
       }
     }
   }
 
-  // Step 9: Log a warning if tokenId extraction fails.
-  // If the function reaches this point, it means the extraction was unsuccessful.
-  log.warning("[extractTokenId] TokenId extraction failed", []);
+  // Step 9: If no valid Transfer event was found or tokenId extraction failed, log a warning
+  // Logging helps with debugging by recording cases where the function didn't work as expected.
+  log.warning(
+    "[extractTokenIdFromLogs] No matching Transfer event found or tokenId extraction failed",
+    []
+  );
+
+  // If tokenId couldn't be extracted, return null
   return null;
+}
+/**
+ * Checks if the OrdersMatched event is present in the transaction logs.
+ *
+ * @param event - The Ethereum event object containing the logs.
+ * @returns True if the OrdersMatched event is found, otherwise false.
+ */
+export function checkForOrdersMatched(event: ethereum.Event): boolean {
+  // Step 1: Check if the event's receipt contains logs
+  if (!event.receipt) {
+    log.warning("[checkForOrdersMatched] No logs found in event receipt", []);
+    return false;
+  }
+
+  // Step 2: Iterate through the logs to find the OrdersMatched event
+  const logs = event.receipt?.logs;
+
+  for (let i = 0; i < logs.length; i++) {
+    let currLog = logs[i]; // Access the log at the current index
+
+    // Step 3: Check if the current log matches the OrdersMatched event signature
+    if (
+      currLog.topics.length > 0 &&
+      currLog.topics[0].equals(ORDERS_MATCHED_EVENT_SIG)
+    ) {
+      return true; // OrdersMatched event found
+    }
+  }
+
+  // Step 4: Return false if the OrdersMatched event is not found
+  return false;
 }
 
 /*export function getTokenIdFromReceipt(event: ethereum.Event): BigInt | null {

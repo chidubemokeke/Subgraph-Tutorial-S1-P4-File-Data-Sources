@@ -42,7 +42,7 @@ export function createOrUpdateTransaction(event: ethereum.Event): Transaction {
   // Save the Transaction entity.
   transaction.save();
 
-  return transaction as Transaction;
+  return transaction;
 }
 
 /**

@@ -29,7 +29,7 @@ export const OPENSEA_ADDRESS = Bytes.fromUTF8(
   "0x7f268357A8c2552623316e2562D90e642bB538E5"
 );
 
-export const ordersMatchedSig = crypto.keccak256(
+export const ORDERS_MATCHED_EVENT_SIG = crypto.keccak256(
   ByteArray.fromUTF8(
     "OrdersMatched(bytes32,bytes32,address,address,uint256,bytes32)"
   )
@@ -39,6 +39,7 @@ export const ordersMatchedSig = crypto.keccak256(
 export const transferEventSignature =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f6e2a1be4d2d8e";
 
+// The keccak256 signature of the Transfer event
 export const TRANSFER_EVENT_SIG = crypto.keccak256(
   ByteArray.fromUTF8("Transfer(address,address,uint256)")
 );
