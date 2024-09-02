@@ -19,7 +19,7 @@ type Account @entity {
   "Array of CovenTokens received by the account"
   received: [CovenToken!]! @derivedFrom(field: "to")
 
-  "Transaction count for account, Mint/Sale/buy/activity"
+  "Transaction counts for the account, including minting, buying, selling, and other activities"
   transactionCount: BigInt!
   mintCount: BigInt!
   buyCount: BigInt!
@@ -36,93 +36,98 @@ type Account @entity {
   "True if the account only bought and sold at least one Token in OpenSea"
   isTrader: Boolean
 
-  "Aggregated fields"
+  "Aggregated transaction fields"
   totalAmountBought: BigInt! # The total value of NFTs bought
   totalAmountSold: BigInt! # The total value of NFTs sold
   totalAmountBalance: BigInt! # The total balance of the account in terms of cryptocurrency
-  "Array of transactions - One-to-Many relationship: An account can have multiple transactions (Mints/Buys/Sales)"
+  "Array of transactions associated with the account"
   transactions: [Transaction!]! @derivedFrom(field: "account")
   history: [AccountHistory!]! @derivedFrom(field: "history") # One-to-Many relationship: An account can have multiple historical records (Mints/Buys/Sales)
-  "Transaction Details"
+  "Transaction details for tracking changes"
   logIndex: BigInt! # Index of the log within the transaction
   txHash: Bytes!
   blockNumber: BigInt! # The block number when this entity was last updated. Helps in tracking historical changes.
   blockTimestamp: BigInt!
 }
 
-# AccountHistory Entity to track history and update account types. (OG, Collector, Hunter, Farmer, Trader)
+# AccountHistory Entity to track historical records and update account types
 type AccountHistory @entity {
-  "TxHash + logNumber # Used for analysing historical transactions"
+  "Unique identifier for the history record combining TxHash and logIndex"
   id: ID!
+
+  "Reference to the associated account"
   history: Account!
 
-  "Current owner of NFT for analysis"
+  "Current owner of the NFT for historical analysis"
   owner: Bytes!
 
-  "Transaction count for account, Mint/Sale/buy/activity at the time of the history record"
+  "Transaction counts at the time of the history record"
   mintCount: BigInt! # Mint count at the time of the history record
   buyCount: BigInt! # Buy count at the time of the history record
   saleCount: BigInt! # Sale count at the time of the history record
-  "The type of account at the time of the history record (e.g., OG, Collector, Hunter, Farmer, Trader)."
+  "The type of account at the time of the history record"
   accountType: String!
-  "Transaction Details"
+
+  "Transaction details for tracking historical changes"
   logIndex: BigInt! # Index of the log within the transaction
   txHash: Bytes!
-  blockNumber: BigInt! # The block number when this entity was last updated. Helps in tracking historical changes.
-  blockTimestamp: BigInt!
+  blockNumber: BigInt! # Block number when this entity was last updated
+  blockTimestamp: BigInt! # Timestamp of the block when this entity was last updated
 }
 
-# Represents Coven token Transfer Events (handleTransfer)
+# Represents Coven token transfer events
 type CovenToken @entity {
-  "TxHash + logNumber #This ID/Entity is used for referencing events in the same transaction"
+  "Unique identifier for the token transfer event combining TxHash and logIndex"
   id: ID!
 
-  "Reference to the accounts involved in the transfer event"
-  from: Account! # The address of the sender
-  to: Account! # The address of the receiver
-  "New owner"
+  "Reference to the accounts involved in the transfer"
+  from: Account! # Sender's address
+  to: Account! # Receiver's address
+  "New owner of the token"
   owner: Bytes!
 
   "The ID of the token"
   tokenId: String!
 
-  "Total number of times NFT has been minted"
+  "Total number of times the NFT has been minted"
   tokenMintCount: BigInt!
 
-  "Transaction details"
+  "Transaction details for tracking changes"
   logIndex: BigInt! # Index of the log within the transaction
   txHash: Bytes!
-  blockNumber: BigInt! # The block number when this entity was last updated. Helps in tracking historical changes.
-  blockTimestamp: BigInt!
+  blockNumber: BigInt! # Block number when this entity was last updated
+  blockTimestamp: BigInt! # Timestamp of the block when this entity was last updated
 }
 
 # Definition of the Transaction entity
 type Transaction @entity {
-  "TxHash + logNumber #This ID/Entity is used for referencing events in the same transaction"
+  "Unique identifier for the transaction combining TxHash and logIndex"
   id: ID!
+
+  "Reference to the associated account"
   account: Account!
 
-  "Reference to the corresponding event/transaction in the CryptoCoven contract (TokenID)"
+  "Reference to the corresponding event/transaction in the contract"
   referenceId: String!
 
-  "Transaction type defined by the enum, Trade/Mint"
+  "Type of transaction defined by the enum"
   transactionType: TransactionType!
 
-  "Parties involves in Opensea Sale"
-  buyer: Bytes! # The address of the buyer (for sales).
-  seller: Bytes! # The address of the seller (for sales).
+  "Addresses involved in the sale transaction"
+  buyer: Bytes! # Address of the buyer (for sales)
+  seller: Bytes! # Address of the seller (for sales)
   "NFT sale transaction details"
-  nftSalePrice: BigInt! # The amount of the NFT Tokens sold (relevant for sales).
-  totalNFTsSold: BigInt! # The total number of NFTs sold in this transaction (relevant for sales).
+  nftSalePrice: BigInt! # Amount of the NFT Tokens sold
+  totalNFTsSold: BigInt! # Total number of NFTs sold in this transaction
   "Aggregated data fields"
-  totalSalesVolume: BigInt! # Aggregates the total amount sold across all transactions
-  averageSalePrice: BigDecimal! # Calculates the average price of NFTs sold.
-  totalSalesCount: BigInt! # Tracks the total number of NFT sales.
-  highestSalePrice: BigInt! # Records the highest sale price of an NFT.
-  lowestSalePrice: BigInt! # Records the lowest sale price of an NFT.
-  "Transaction details"
+  totalSalesVolume: BigInt! # Total amount sold across all transactions
+  averageSalePrice: BigDecimal! # Average price of NFTs sold
+  totalSalesCount: BigInt! # Total number of NFT sales
+  highestSalePrice: BigInt! # Highest sale price of an NFT
+  lowestSalePrice: BigInt! # Lowest sale price of an NFT
+  "Transaction details for tracking changes"
   logIndex: BigInt! # Index of the log within the transaction
   txHash: Bytes!
-  blockNumber: BigInt! # The block number when this entity was last updated. Helps in tracking historical changes.
-  blockTimestamp: BigInt! # The timestamp of the block when this transaction was recorded. Provides a time reference.
+  blockNumber: BigInt! # Block number when this entity was last updated
+  blockTimestamp: BigInt! # Timestamp of the block when this entity was last updated
 }

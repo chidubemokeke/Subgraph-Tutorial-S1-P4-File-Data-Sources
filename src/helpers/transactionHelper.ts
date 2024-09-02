@@ -1,48 +1,28 @@
 import { ethereum, Bytes, log } from "@graphprotocol/graph-ts";
-import { Transaction } from "../../generated/schema";
-import { BIGINT_ZERO, BIGDECIMAL_ZERO, ordersMatchedSig } from "./constant";
-import { getTransactionId } from "./utils";
+import { Account, Transaction } from "../../generated/schema";
+import { ORDERS_MATCHED_EVENT_SIG } from "./constant";
+
+// Enum to define the possible types of transactions
+enum TransactionType {
+  TRANSFER,
+  TRADE,
+  MINT,
+}
 
 /**
- * Creates or updates a Transaction entity using only the getTransactionId.
+ * Function to retrieve an Account entity by ID.
  *
- * @param event - The Ethereum event object containing transaction details.
+ * This function attempts to load an Account entity by its ID and returns it.
+ * If the account does not exist, it returns null.
+ *
+ * @param id - The ID of the account to retrieve.
+ * @returns - The Account entity or null if not found.
  */
-export function createOrUpdateTransaction(event: ethereum.Event): Transaction {
-  // Generate the ID using the transaction hash and log index
-  let id = getTransactionId(event.transaction.hash, event.logIndex);
+export function getAccountById(id: string): Account | null {
+  let account = Account.load(id);
 
-  // Load the existing Transaction entity, or create a new one if it doesn't exist.
-  let transaction = Transaction.load(id);
-
-  if (transaction == null) {
-    // If the transaction doesn't exist, create a new entity.
-    transaction = new Transaction(id);
-  }
-
-  // Initialize or update other fields here as required.
-  transaction.txHash = event.transaction.hash;
-  transaction.logIndex = event.logIndex;
-  transaction.blockNumber = event.block.number;
-  transaction.blockTimestamp = event.block.timestamp;
-
-  // Additional fields can be initialized or updated here
-  transaction.account = transaction.id;
-  transaction.referenceId = "";
-  transaction.buyer = Bytes.empty();
-  transaction.seller = Bytes.empty();
-  transaction.nftSalePrice = BIGINT_ZERO;
-  transaction.totalNFTsSold = BIGINT_ZERO;
-  transaction.totalSalesVolume = BIGINT_ZERO;
-  transaction.averageSalePrice = BIGDECIMAL_ZERO;
-  transaction.totalSalesCount = BIGINT_ZERO;
-  transaction.highestSalePrice = BIGINT_ZERO;
-  transaction.lowestSalePrice = BIGINT_ZERO;
-
-  // Save the Transaction entity.
-  transaction.save();
-
-  return transaction;
+  // Return the account if found, otherwise return null
+  return account;
 }
 
 /**
@@ -52,9 +32,8 @@ export function createOrUpdateTransaction(event: ethereum.Event): Transaction {
  * @param event - The Ethereum event to be processed.
  * @returns A boolean indicating whether an `OrdersMatched` event is found after the current event.
  */
-export function processTransactionReceipt(event: ethereum.Event): boolean {
+export function processTransactionReceipt(): boolean {
   // Define the keccak256 hash of the `OrdersMatched` event signature.
-  const ordersMatched = ordersMatchedSig;
 
   // Check if the event has an associated transaction receipt.
   if (!event.receipt) {
@@ -95,7 +74,7 @@ export function processTransactionReceipt(event: ethereum.Event): boolean {
     const topic0Sig = nextLog.topics[0];
 
     // Compare the topic0 of the next log with the `OrdersMatched` signature.
-    if (topic0Sig.equals(ordersMatchedSig)) {
+    if (topic0Sig.equals(ORDERS_MATCHED_EVENT_SIG)) {
       // If they match, the `OrdersMatched` event is found.
       return true;
     }

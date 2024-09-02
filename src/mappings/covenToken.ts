@@ -13,12 +13,11 @@ import {
 } from "../helpers/utils";
 import { ZERO_ADDRESS } from "../helpers/constant";
 
-export @enum {
-  MINT
-  TRADE
-  TRANSFER
+export enum transactionType {
+  MINT,
+  TRADE,
+  TRANSFER,
 }
-
 
 /**
  * Handles Transfer events from the smart contract.
@@ -77,8 +76,8 @@ export function handleTransfer(event: TransferEvent): void {
   let transactionType = isMint
     ? "MINT"
     : checkForOrdersMatched(event)
-      ? "TRADE"
-      : "TRANSFER";
+    ? "TRADE"
+    : "TRANSFER";
 
   // Step 7: Update transaction counts based on the determined transaction type.
   // This step ensures that the appropriate counters are incremented based on the type of transaction.
@@ -98,7 +97,7 @@ export function handleTransfer(event: TransferEvent): void {
   // Step 8: Update account types and histories.
   // This step involves updating the account types (e.g., whether the account is a buyer, seller, etc.)
   // and creating account history entities to track past transactions.
- determineAccountType(fromAccount);
+  determineAccountType(fromAccount);
   determineAccountType(toAccount);
 
   updateAccountType(fromAccount);

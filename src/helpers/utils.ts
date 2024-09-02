@@ -5,51 +5,90 @@ import {
   ethereum,
   log,
 } from "@graphprotocol/graph-ts";
-import { CovenToken } from "../../generated/schema";
+import { Account, CovenToken, Transaction } from "../../generated/schema";
 import {
   BIGINT_ZERO,
-  BIGDECIMAL_ZERO,
   TRANSFER_EVENT_SIG,
   ORDERS_MATCHED_EVENT_SIG,
+  BIGINT_ONE,
 } from "./constant";
 
 /**
- * Generates a unique identifier for a Transaction entity.
- * The identifier is based on the transaction hash and log index.
+ * Function to retrieve an Account entity by ID.
  *
- * @param txHash - The hash of the transaction.
- * @param logIndex - The index of the log within the transaction.
- * @returns A unique string identifier for the Transaction entity.
+ * This function attempts to load an Account entity by its ID and returns it.
+ * If the account does not exist, it returns null.
+ *
+ * @param id - The ID of the account to retrieve.
+ * @returns - The Account entity or null if not found.
  */
-export function getTransactionId(txHash: Bytes, logIndex: BigInt): string {
-  // Convert the transaction hash to a hex string and append the log index as a string.
-  let id = txHash.toHex() + "-" + logIndex.toString();
-  return id;
+export function getAccountById(id: string): Account | null {
+  let account = Account.load(id);
+
+  // Return the account if found, otherwise return null
+  return account;
 }
 
 /**
- * Calculates the average sale price from a list of sale prices.
+ * Function to calculate and aggregate transaction data.
  *
- * @param totalSalesVolume - The total sales volume (sum of all sale prices).
- * @param totalSalesCount - The total number of sales.
- * @returns The average sale price as a BigDecimal.
+ * This function calculates aggregated metrics like total sales volume, average sale price,
+ * total sales count, highest sale price, and lowest sale price based on the provided transactions.
+ *
+ * @param transactions - An array of Transaction entities from which to calculate data.
+ * @returns - An object containing aggregated transaction data.
  */
-export function calculateAverageSalePrice(
-  totalSalesVolume: BigInt,
-  totalSalesCount: BigInt
-): BigDecimal {
-  // Check if there have been any sales
-  if (totalSalesCount.equals(BIGINT_ZERO)) {
-    // If no sales, return 0 as the average price
-    return BIGDECIMAL_ZERO;
+export function calculateAggregatedData(transactions: Transaction[]): {
+  totalSalesVolume: BigInt;
+  averageSalePrice: BigDecimal;
+  totalSalesCount: BigInt;
+  highestSalePrice: BigInt;
+  lowestSalePrice: BigInt;
+} {
+  // Initialize aggregation variables
+  let totalSalesVolume = BIGINT_ZERO;
+  let totalSalesCount = BIGINT_ZERO;
+  let highestSalePrice = BIGINT_ZERO;
+  let lowestSalePrice = BigInt.fromI32(2 ** 31 - 1); // Setting it to max int32 value initially
+  let sumOfSalePrices = BigDecimal.fromString("0");
+
+  // Iterate over each transaction to calculate the aggregated data
+  for (let i = 0; i < transactions.length; i++) {
+    let transaction = transactions[i];
+
+    // Only process transactions that are of type SALE
+    if (transaction.transactionType == "SALE") {
+      totalSalesVolume = totalSalesVolume.plus(transaction.nftSalePrice);
+      totalSalesCount = totalSalesCount.plus(BIGINT_ONE);
+
+      // Update the highest sale price if current transaction is higher
+      if (transaction.nftSalePrice.gt(highestSalePrice)) {
+        highestSalePrice = transaction.nftSalePrice;
+      }
+
+      // Update the lowest sale price if current transaction is lower
+      if (transaction.nftSalePrice.lt(lowestSalePrice)) {
+        lowestSalePrice = transaction.nftSalePrice;
+      }
+
+      // Sum up the sale prices for average calculation
+      sumOfSalePrices = sumOfSalePrices.plus(
+        transaction.nftSalePrice.toBigDecimal()
+      );
+    }
   }
 
-  // Convert the total sales volume and count to BigDecimal for division
-  let totalSalesVolumeDecimal = totalSalesVolume.toBigDecimal();
-  let totalSalesCountDecimal = totalSalesCount.toBigDecimal();
+  // Calculate the average sale price
+  let averageSalePrice = sumOfSalePrices.div(totalSalesCount.toBigDecimal());
 
-  // Calculate the average sale price by dividing total sales volume by total sales count
-  return totalSalesVolumeDecimal.div(totalSalesCountDecimal);
+  // Return the aggregated data
+  return {
+    totalSalesVolume,
+    averageSalePrice,
+    totalSalesCount,
+    highestSalePrice,
+    lowestSalePrice,
+  };
 }
 
 /**
@@ -63,7 +102,7 @@ export function calculateAverageSalePrice(
  * @param currentPrice - The price of the current sale.
  * @param previousHighestPrice - The previously recorded highest sale price, or null if this is the first transaction.
  * @returns - The updated highest sale price.
- */
+ 
 export function calculateHighestSalePrice(
   currentPrice: BigInt,
   previousHighestPrice: BigInt | null
@@ -90,7 +129,7 @@ export function calculateHighestSalePrice(
  * @param currentPrice - The price of the current sale.
  * @param previousLowestPrice - The previously recorded lowest sale price, or null if this is the first transaction.
  * @returns - The updated lowest sale price.
- */
+ 
 export function calculateLowestSalePrice(
   currentPrice: BigInt,
   previousLowestPrice: BigInt | null
@@ -105,11 +144,37 @@ export function calculateLowestSalePrice(
     ? currentPrice
     : previousLowestPrice;
 }
+
+
+/**
+ * Calculates the average sale price from a list of sale prices.
+ *
+ * @param totalSalesVolume - The total sales volume (sum of all sale prices).
+ * @param totalSalesCount - The total number of sales.
+ * @returns The average sale price as a BigDecimal.
+export function calculateAverageSalePrice(
+  totalSalesVolume: BigInt,
+  totalSalesCount: BigInt
+): BigDecimal {
+  // Check if there have been any sales
+  if (totalSalesCount.equals(BIGINT_ZERO)) {
+    // If no sales, return 0 as the average price
+    return BIGDECIMAL_ZERO;
+  }
+
+  // Convert the total sales volume and count to BigDecimal for division
+  let totalSalesVolumeDecimal = totalSalesVolume.toBigDecimal();
+  let totalSalesCountDecimal = totalSalesCount.toBigDecimal();
+
+  // Calculate the average sale price by dividing total sales volume by total sales count
+  return totalSalesVolumeDecimal.div(totalSalesCountDecimal);
+}*/
+
 /**
  * Creates or updates a CovenToken entity using the tokenId as the primary parameter.
  *
  * @param tokenId - The unique ID of the token being transferred.
- */
+ 
 export function createOrUpdateCovenToken(tokenId: BigInt): CovenToken {
   // Convert the tokenId to a hex string to use as the ID for the CovenToken entity.
   let id = tokenId.toHex();
@@ -163,7 +228,7 @@ export function extractTokenIdFromLogs(event: ethereum.Event): BigInt | null {
   // Step 2: Extract the logs from the event receipt
   // Logs are essentially event data generated during the execution of the transaction.
   // They are stored as an array of log objects within the receipt.
-  const logs = event.receipt?.logs;
+  const logs = event.receipt!.logs;
 
   // Step 3: Initialize a variable to track the index of the OrdersMatched event
   // This variable will help us identify the position of the OrdersMatched event in the logs array.
@@ -239,7 +304,7 @@ export function checkForOrdersMatched(event: ethereum.Event): boolean {
   }
 
   // Step 2: Iterate through the logs to find the OrdersMatched event
-  const logs = event.receipt?.logs;
+  const logs = event.receipt!.logs;
 
   for (let i = 0; i < logs.length; i++) {
     let currLog = logs[i]; // Access the log at the current index

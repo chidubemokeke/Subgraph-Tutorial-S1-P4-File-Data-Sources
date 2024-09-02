@@ -1,5 +1,5 @@
 import { Bytes } from "@graphprotocol/graph-ts";
-import { Account, AccountHistory } from "../../generated/schema";
+import { Account, AccountHistory, Transaction } from "../../generated/schema";
 import { BIGINT_ONE, BIGINT_ZERO } from "./constant";
 
 /**
@@ -53,7 +53,7 @@ export function loadOrCreateAccount(accountId: Bytes): Account {
  *
  * @param account - The current state of the Account entity.
  * @param accountType - The type of the account (e.g., OG, Collector) at the time of this history entry.
- */
+ 
 export function createAccountHistory(account: Account): void {
   // Generate a unique ID for the AccountHistory entity. This ID is a combination of the account ID and the transaction count.
   let historyId = account.id + "-" + account.transactionCount.toString();
@@ -81,7 +81,7 @@ export function createAccountHistory(account: Account): void {
   // Save the AccountHistory entity to the store.
   // The history is saved immediately because it's a complete record of a past state.
   accountHistory.save();
-}
+}*/
 
 /**
  * This function updates the transaction counts in the Account entity based on the transaction type.
@@ -119,13 +119,53 @@ export function updateTransactionCounts(
 }
 
 /**
- * This function updates the account type flags in the Account entity based on the transaction counts.
- * The function sets flags like isOG, isCollector, etc., based on the current state of the account.
+ * Function to determine the account type based on transaction history.
  *
- * @param account - The Account entity to be updated.
+ * This function increments the counts for different transaction types (MINT, TRADE, TRANSFER)
+ * in the Account entity. These counts are used later to categorize the account type.
+ *
+ * @param account - The Account entity being updated.
+ * @param transaction - The Transaction entity containing the transaction details.
+ */
+export function determineAccountType(
+  account: Account,
+  transaction: Transaction
+): void {
+  // Incrementing the respective count based on the transaction type
+  if (transaction.transactionType == "MINT") {
+    // If the transaction is a MINT, increment mintCount
+    account.mintCount = account.mintCount.plus(BIGINT_ONE);
+  } else if (transaction.transactionType == "TRADE") {
+    // If the transaction is a TRADE, check if the account is the buyer or seller
+    if (transaction.buyer) {
+      account.buyCount = account.buyCount.plus(BIGINT_ONE); // Increment buyCount if buyer
+    } else {
+      account.saleCount = account.saleCount.plus(BIGINT_ONE); // Increment saleCount if seller
+    }
+  } else if (transaction.transactionType == "TRANSFER") {
+    // If the transaction is a TRANSFER, increment transactionCount
+    account.transactionCount = account.transactionCount.plus(BIGINT_ONE);
+  }
+
+  // Increment the overall transactionCount regardless of the type
+  account.transactionCount = account.transactionCount.plus(BIGINT_ONE);
+
+  // Persist the changes to the account entity
+  account.save();
+}
+
+/**
+ * Function to update the account type based on transaction counts.
+ *
+ * This function categorizes the account into different types (isOG, isCollector, isHunter, isFarmer, isTrader)
+ * based on the number of mints, buys, and sales. It sets flags on the account accordingly.
+ *
+ * @param account - The Account entity to be updated with the type flags.
  */
 export function updateAccountType(account: Account): void {
-  // Set isOG to true if the account has minted tokens but hasn't bought or sold any.
+  // Determine account type based on the transaction counts and set appropriate flags
+
+  // Account is an OG if it has minted tokens but hasn't bought or sold any
   if (
     account.mintCount.ge(BIGINT_ONE) &&
     account.buyCount.equals(BIGINT_ZERO) &&
@@ -133,7 +173,7 @@ export function updateAccountType(account: Account): void {
   ) {
     account.isOG = true;
   }
-  // Set isCollector to true if the account has minted and bought tokens but hasn't sold any.
+  // Account is a Collector if it has minted and bought tokens but hasn't sold any
   else if (
     account.mintCount.ge(BIGINT_ONE) &&
     account.buyCount.ge(BIGINT_ONE) &&
@@ -141,7 +181,7 @@ export function updateAccountType(account: Account): void {
   ) {
     account.isCollector = true;
   }
-  // Set isHunter to true if the account has minted and sold tokens but hasn't bought any.
+  // Account is a Hunter if it has minted and sold tokens but hasn't bought any
   else if (
     account.mintCount.ge(BIGINT_ONE) &&
     account.saleCount.ge(BIGINT_ONE) &&
@@ -149,7 +189,7 @@ export function updateAccountType(account: Account): void {
   ) {
     account.isHunter = true;
   }
-  // Set isFarmer to true if the account has minted, bought, and sold tokens.
+  // Account is a Farmer if it has minted, bought, and sold tokens
   else if (
     account.mintCount.ge(BIGINT_ONE) &&
     account.saleCount.ge(BIGINT_ONE) &&
@@ -157,7 +197,7 @@ export function updateAccountType(account: Account): void {
   ) {
     account.isFarmer = true;
   }
-  // Set isTrader to true if the account has bought and sold tokens without minting any.
+  // Account is a Trader if it has bought and sold tokens without minting any
   else if (
     account.mintCount.equals(BIGINT_ZERO) &&
     account.saleCount.ge(BIGINT_ONE) &&
@@ -165,24 +205,9 @@ export function updateAccountType(account: Account): void {
   ) {
     account.isTrader = true;
   }
-  return;
-}
 
-/** This helper function determines the current type of an account based on its flags.
- * It checks the boolean fields isOG, isCollector, etc., to return the corresponding type as a string.
- *
- * @param account - The Account entity whose type is to be determined.
- / @returns A string representing the current type of the account. **/
-
-export function determineAccountType(account: Account): string {
-  if (account.isOG) return "OG";
-  if (account.isCollector) return "Collector";
-  if (account.isHunter) return "Hunter";
-  if (account.isFarmer) return "Farmer";
-  if (account.isTrader) return "Trader";
-
-  // Return "Unknown" if none of the above conditions are met.
-  return "Unknown";
+  // No need to explicitly save here as this function can be called after determineAccountType
+  // where save() is already called.
 }
 
 /**

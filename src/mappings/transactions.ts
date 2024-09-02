@@ -4,6 +4,7 @@ import {
   createAccountHistory,
   updateTransactionCounts,
   updateAccountType,
+  determineAccountType,
 } from "../helpers/accountHelper";
 import {
   calculateAverageSalePrice,
@@ -14,6 +15,12 @@ import {
 } from "../helpers/utils";
 import { createOrUpdateTransaction } from "../helpers/transactionHelper";
 import { BIGINT_ONE } from "../helpers/constant";
+
+export enum transactionType {
+  MINT,
+  TRADE,
+  TRANSFER,
+}
 
 /**
  * Handles OrdersMatched events from the OpenSea smart contract.
@@ -33,36 +40,28 @@ export function handleOpenSea(event: OrdersMatchedEvent): void {
   let sellerAccount = loadOrCreateAccount(event.params.maker);
   let transaction = createOrUpdateTransaction(event);
 
-  // Step 2: Set the transaction type to TRADE (sale) for OrdersMatched events.
-  // transaction.transactionType = "TRADE";
-
-  // Step 3: Retrieve the token contract address (you need to set this correctly)
-  // For example, you might have a constant or retrieve it from an environment variable.
-  // Replace 'YOUR_TOKEN_CONTRACT_ADDRESS' with the actual address.
-  // let tokenContractAddress = CRYPTOCOVEN_ADDRESS;
-
-  // Call extractTokenId with event and tokenContractAddress
+  // Step 2: Extract the tokenId from the event logs.
   let tokenIdfromReceipt = extractTokenIdFromLogs(event);
 
-  // Step 4: Check if the tokenId is valid before proceeding.
+  // Step 3: Check if the tokenId is valid before proceeding.
   if (tokenIdfromReceipt) {
-    // Step 5: Create or update the CovenToken entity.
+    // Step 4: Create or update the CovenToken entity.
     let covenToken = createOrUpdateCovenToken(tokenIdfromReceipt);
 
-    // Step 6: Set the new owner of the token.
+    // Step 5: Set the new owner of the token.
     covenToken.owner = event.params.taker;
 
     // Save the updated CovenToken entity.
     covenToken.save();
 
-    // Step 7: Update the Transaction entity with the tokenId as the referenceId.
+    // Step 6: Update the Transaction entity with the tokenId as the referenceId.
     transaction.referenceId = tokenIdfromReceipt.toHex();
 
     // Save the updated Transaction entity with the new referenceId.
     transaction.save();
   }
 
-  // Step 8: Calculate various statistics related to the sale.
+  // Step 7: Calculate various statistics related to the sale.
   let salePrice = event.params.price;
   let previousHighestSalePrice = transaction.highestSalePrice;
   let previousLowestSalePrice = transaction.lowestSalePrice;
@@ -94,10 +93,7 @@ export function handleOpenSea(event: OrdersMatchedEvent): void {
   // Save the updated Transaction entity with all the updated statistics and details.
   transaction.save();
 
-  // Step 9: Load or create Account entities for the buyer and seller involved in the transaction.
-  // This has already been done in Step 1.
-
-  // Step 10: Initialize or update transaction details for both accounts.
+  // Step 8: Initialize or update transaction details for both accounts.
   buyerAccount.logIndex = event.logIndex;
   buyerAccount.txHash = event.transaction.hash;
   buyerAccount.blockNumber = event.block.number;
@@ -108,11 +104,14 @@ export function handleOpenSea(event: OrdersMatchedEvent): void {
   sellerAccount.blockNumber = event.block.number;
   sellerAccount.blockTimestamp = event.block.timestamp;
 
-  // Step 11: Update transaction counts for both buyer and seller.
+  // Step 9: Update transaction counts for both buyer and seller.
   updateTransactionCounts(buyerAccount, "TRADE");
   updateTransactionCounts(sellerAccount, "TRADE");
 
-  // Step 12: Update account types and histories for both buyer and seller.
+  // Step 10: Update account types and histories for both buyer and seller.
+  determineAccountType(buyerAccount);
+  determineAccountType(sellerAccount);
+
   updateAccountType(buyerAccount);
   updateAccountType(sellerAccount);
 
