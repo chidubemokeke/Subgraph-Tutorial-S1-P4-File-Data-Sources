@@ -1,7 +1,7 @@
 # Enum for Transaction Types
 # This defines an enumeration called TransactionType.
 # Enums are a way to define a set of named values.
-# In this case, the values are TRADE and MINT, which represent different types of transactions.
+# In this case, the values are TRADE, MINT and TRANSFER which represent different types of transactions.
 enum TransactionType {
   TRADE # Represents a sale transaction where an NFT is sold
   MINT # Represents a mint transaction where a new NFT is created
@@ -75,7 +75,7 @@ type AccountHistory @entity {
   blockTimestamp: BigInt! # Timestamp of the block when this entity was last updated
 }
 
-# Represents Coven token transfer events
+# Represents the Token transfer event
 type CovenToken @entity {
   "Unique identifier for the token transfer event combining TxHash and logIndex"
   id: ID!
@@ -107,7 +107,7 @@ type Transaction @entity {
   "Reference to the associated account"
   account: Account!
 
-  "Reference to the corresponding event/transaction in the contract"
+  "The ID of the token extracted from the event logs with Transaction receipts"
   referenceId: String!
 
   "Type of transaction defined by the enum"
