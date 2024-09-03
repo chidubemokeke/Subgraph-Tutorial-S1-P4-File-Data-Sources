@@ -92,6 +92,45 @@ export function calculateAggregatedData(transactions: Transaction[]): {
 }
 
 /**
+ * Analyzes the logs in the transaction receipt to determine the type of transaction (TRADE, MINT, TRANSFER).
+ * It checks for specific event signatures in the logs to classify the transaction.
+ * 
+ * @param receipt - The transaction receipt object, which contains logs and other details.
+ * @param event - The Transfer event object for context.
+ * @returns A string representing the transaction type ("TRADE", "MINT", or "TRANSFER").
+ 
+function determineTransactionTypeFromReceiptLogs(receipt: ethereum.TransactionReceipt, event: Transfer): string {
+  // Initialize the default transaction type as "TRANSFER". This is the fallback value if no specific type is found.
+  let transactionType: string = "TRANSFER"; 
+
+  // Check if the 'from' address is the zero address (indicating a mint transaction).
+  if (event.params.from == Address.zero()) {
+    transactionType = "MINT";
+  } else {
+    // Get the array of logs from the transaction receipt.
+    let logs = receipt.logs;
+
+    // Iterate over each log entry in the receipt to find specific events that determine the transaction type.
+    for (let i = 0; i < logs.length; i++) {
+      let log = logs[i];
+      let topics = log.topics; // Each log has a list of topics, which contain event signatures and indexed parameters.
+      
+      // Check if the log contains any topics (event signatures).
+      if (topics.length > 0) {
+        // Check if the first topic matches the known event signature for a trade (Replace with actual keccak256 hash for OrdersMatched).
+        if (topics[0].toHexString() == "0xOrdersMatchedEventSignatureHere") {
+          transactionType = "TRADE"; // Set to TRADE if the OrdersMatched event signature is found in the log.
+          break; // Exit loop as we have determined the transaction type.
+        }
+      }
+    }
+  }
+  
+  // Return the determined transaction type.
+  return transactionType;
+}
+
+/**
  * Function to calculate the highest sale price.
  *
  * This function checks whether the current sale price is higher than the previous

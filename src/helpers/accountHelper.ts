@@ -1,4 +1,4 @@
-import { Bytes } from "@graphprotocol/graph-ts";
+import { BigInt, Bytes } from "@graphprotocol/graph-ts";
 import { Account, AccountHistory, Transaction } from "../../generated/schema";
 import { BIGINT_ONE, BIGINT_ZERO } from "./constant";
 
@@ -40,11 +40,9 @@ export function loadOrCreateAccount(accountId: Bytes): Account {
     account.txHash = Bytes.empty();
     account.blockNumber = BIGINT_ZERO;
     account.blockTimestamp = BIGINT_ZERO;
+    account.save(); // Save the newly created account to the store.
   }
-
-  // The account entity is returned, but not saved yet.
-  // This allows the caller function to make additional changes before saving.
-  return account;
+  return account; // Return the loaded or newly created account.
 }
 
 /**
@@ -154,62 +152,57 @@ export function determineAccountType(
   account.save();
 }
 
-/**
- * Function to update the account type based on transaction counts.
- *
- * This function categorizes the account into different types (isOG, isCollector, isHunter, isFarmer, isTrader)
- * based on the number of mints, buys, and sales. It sets flags on the account accordingly.
- *
- * @param account - The Account entity to be updated with the type flags.
- */
+// Helper function to update account types
+// Determines the account type based on the account's activity (mint, buy, and sale counts).
+// Sets the appropriate flags for the account type and saves the updated entity.
 export function updateAccountType(account: Account): void {
-  // Determine account type based on the transaction counts and set appropriate flags
-
-  // Account is an OG if it has minted tokens but hasn't bought or sold any
+  // Check different conditions to determine the account type.
   if (
-    account.mintCount.ge(BIGINT_ONE) &&
-    account.buyCount.equals(BIGINT_ZERO) &&
-    account.saleCount.equals(BIGINT_ZERO)
+    account.mintCount.gt(BIGINT_ZERO) &&
+    account.buyCount.isZero() &&
+    account.saleCount.isZero()
   ) {
-    account.isOG = true;
-  }
-  // Account is a Collector if it has minted and bought tokens but hasn't sold any
-  else if (
-    account.mintCount.ge(BIGINT_ONE) &&
-    account.buyCount.ge(BIGINT_ONE) &&
-    account.saleCount.equals(BIGINT_ZERO)
+    account.isOG = true; // If the account has minted tokens but not bought or sold any, it's an "OG".
+    account.isCollector = false;
+    account.isHunter = false;
+    account.isFarmer = false;
+    account.isTrader = false;
+  } else if (
+    account.mintCount.gt(BIGINT_ZERO) &&
+    account.buyCount.gt(BIGINT_ZERO)
   ) {
-    account.isCollector = true;
-  }
-  // Account is a Hunter if it has minted and sold tokens but hasn't bought any
-  else if (
-    account.mintCount.ge(BIGINT_ONE) &&
-    account.saleCount.ge(BIGINT_ONE) &&
-    account.buyCount.equals(BIGINT_ZERO)
+    account.isCollector = true; // If the account has both minted and bought tokens, it's a "Collector".
+    account.isOG = false;
+  } else if (
+    account.mintCount.gt(BIGINT_ZERO) &&
+    account.saleCount.gt(BIGINT_ZERO) &&
+    account.buyCount.isZero()
   ) {
-    account.isHunter = true;
-  }
-  // Account is a Farmer if it has minted, bought, and sold tokens
-  else if (
-    account.mintCount.ge(BIGINT_ONE) &&
-    account.saleCount.ge(BIGINT_ONE) &&
-    account.buyCount.ge(BIGINT_ONE)
+    account.isHunter = true; // If the account has minted and sold tokens but not bought any, it's a "Hunter".
+    account.isCollector = false;
+    account.isOG = false;
+  } else if (
+    account.mintCount.gt(BIGINT_ZERO) &&
+    account.saleCount.gt(BIGINT_ZERO) &&
+    account.buyCount.gt(BIGINT_ZERO)
   ) {
-    account.isFarmer = true;
-  }
-  // Account is a Trader if it has bought and sold tokens without minting any
-  else if (
-    account.mintCount.equals(BIGINT_ZERO) &&
-    account.saleCount.ge(BIGINT_ONE) &&
-    account.buyCount.ge(BIGINT_ONE)
+    account.isFarmer = true; // If the account has minted, sold, and bought tokens, it's a "Farmer".
+    account.isHunter = false;
+    account.isCollector = false;
+    account.isOG = false;
+  } else if (
+    account.mintCount.isZero() &&
+    account.buyCount.gt(BIGINT_ZERO) &&
+    account.saleCount.gt(BIGINT_ZERO)
   ) {
-    account.isTrader = true;
+    account.isTrader = true; // If the account has bought and sold tokens but not minted any, it's a "Trader".
+    account.isFarmer = false;
+    account.isHunter = false;
+    account.isCollector = false;
+    account.isOG = false;
   }
-
-  // No need to explicitly save here as this function can be called after determineAccountType
-  // where save() is already called.
+  account.save(); // Save the updated account to the store.
 }
-
 /**
  * Determines the account type based on the account's transaction history.
  * The function returns a string representing the account type, which can be OG, Collector, Hunter, Farmer, or Trader.
